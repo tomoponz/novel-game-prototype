@@ -85,6 +85,21 @@
   </main>
 
   <script src="story.js"></script>
-  <script type="module" src="game_world.js?v=aurelia-world-polish"></script>
+  <script>
+    (() => {
+      const rawDpr = window.devicePixelRatio || 1;
+      const renderMode = new URLSearchParams(location.search).get("render") || "medium";
+      const cap = renderMode === "high" ? 1.5 : renderMode === "low" ? 1.0 : 1.25;
+      try {
+        Object.defineProperty(window, "devicePixelRatio", {
+          configurable: true,
+          get() { return Math.min(rawDpr, cap); }
+        });
+      } catch (error) {
+        window.__AURELIA_RENDER_CAP__ = cap;
+      }
+    })();
+  </script>
+  <script type="module" src="game_world.js?v=aurelia-world-polish-render-cap"></script>
 </body>
 </html>

@@ -47,6 +47,17 @@
       <pre id="mini-map-text"></pre>
     </section>
 
+    <section class="combat-ui" aria-label="魔法クールタイム">
+      <div class="spell-row">
+        <span>□ FIRE</span>
+        <meter id="fire-cooldown" min="0" max="1" value="1"></meter>
+      </div>
+      <div class="spell-row">
+        <span>△ BURST</span>
+        <meter id="burst-cooldown" min="0" max="1" value="1"></meter>
+      </div>
+    </section>
+
     <aside id="interact-hint" class="interact-hint is-hidden">
       <kbd>E</kbd> <span id="interact-text">話す</span>
     </aside>
@@ -74,6 +85,6 @@
   </main>
 
   <script src="story.js"></script>
-  <script type="module" src="game_world.js"></script>
+  <script type="module" src="game_world.js?v=aurelia-world-polish"></script>
 </body>
 </html>

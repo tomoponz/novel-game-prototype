@@ -1,7 +1,9 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
 const $ = (id) => document.getElementById(id);
-const data = window.GAME_DATA;
+const data = window.GAME_DATA || {};
+const params = new URLSearchParams(location.search);
+
 const ui = {
   canvas: $("game-canvas"), loading: $("loading"), title: $("title-screen"), start: $("start-btn"),
   hint: $("interact-hint"), hintText: $("interact-text"), dialog: $("dialogue"), speaker: $("speaker"), line: $("line"), choices: $("choices"),
@@ -11,1166 +13,277 @@ const ui = {
   quality: $("quality-select")
 };
 
-const bootParams = new URLSearchParams(location.search);
-const debugStartMap = data.maps?.[bootParams.get("map")] ? bootParams.get("map") : null;
-const QUALITY_PROFILES = {
-  low: { pixelRatio: 1.0, shadows: false, cull: { prop: 52, building: 120, npc: 58, cart: 95 }, animate: { ped: 62, cart: 105 } },
-  medium: { pixelRatio: 1.35, shadows: true, cull: { prop: 82, building: 185, npc: 95, cart: 145 }, animate: { ped: 95, cart: 150 } },
-  high: { pixelRatio: 1.5, shadows: true, cull: { prop: 125, building: 250, npc: 145, cart: 210 }, animate: { ped: 145, cart: 220 } }
+const QUALITY = {
+  low: { pixelRatio: 1, houses: .7, props: .5, npcs: .55, carts: 3, shadow: false, fog: 560, cull: 300 },
+  medium: { pixelRatio: 1.25, houses: 1, props: .75, npcs: .85, carts: 5, shadow: true, fog: 760, cull: 380 },
+  high: { pixelRatio: 1.5, houses: 1.22, props: 1, npcs: 1, carts: 7, shadow: true, fog: 980, cull: 460 }
 };
-const qualityParam = bootParams.get("quality") || bootParams.get("render") || "medium";
-const initialQuality = QUALITY_PROFILES[qualityParam] ? qualityParam : "medium";
-let activeQuality = QUALITY_PROFILES[initialQuality];
+const qualityParam = params.get("quality") || params.get("render") || "medium";
+const qualityMode = QUALITY[qualityParam] ? qualityParam : "medium";
+const quality = QUALITY[qualityMode];
 
-const extraDialogues = {
-  wake_after: { speaker: "ユウジ", lines: ["白い輪郭はまだ視界の端に残っている。これは幻覚ではなく、この世界の仕組みだ。", "同じ場所で悩むより、街道の先にある荷車と王都門を確認する。"] },
-  caravan_after: { speaker: "ユウジ", lines: ["黒毛の噛み犬はもう動かない。荷車の周囲には焦げ跡と散らばった木箱だけが残っている。", "何度も火球を撃つ必要はない。紹介状を持って王都へ向かう。"] },
-  caravan_retreat_after: { speaker: "ユウジ", lines: ["荷車の現場にはまだ獣臭が残っている。", "助けなかった事実は消えない。だが、ギルドへ行かなければ身分も得られない。"] },
-  shady_alley: { speaker: "路地裏の男", lines: ["よそ者だな。北門から来た顔をしている。", "この路地では、金より身元の方が高く売れる。用がないなら表通りへ戻れ。"], choices: [{ text: "表通りへ戻る", objective: "ギルドへ向かう" }] },
-  fountain_hint: { speaker: "広場の噴水", lines: ["水面に王城とギルドの旗が映っている。大通りは人と馬車で埋まっている。", "王都は広いが、看板、門、旗、鐘楼を追えば迷いにくい。"] },
-  reception_after: { speaker: "ギルド受付", lines: ["受付処理は進んでいます。次は指定された目的を済ませてください。", "同じ説明を聞くより、行動で確認する方が早いです。"] },
-  priest_after: { speaker: "司祭", lines: ["確認書の話は済みました。ギルドに戻れば受付が読めるはずです。"] },
-  market_vendor: { speaker: "市場の商人", lines: ["荷札のない品は売れないよ。王都では安さより、誰が保証する品かが大事なんだ。"] },
-  adventurer_chatter: { speaker: "冒険者", lines: ["ギルド証なしで剣を抜くなよ。腕前より先に罰金と身元照会が来る。"] },
-  church_faithful: { speaker: "信徒", lines: ["教会は祈る場所でもあり、記録を預かる場所でもあります。名前を残すことは、この街で生きる足場です。"] },
-  guard_checkpoint: { speaker: "北門衛兵", lines: ["北門を抜けた者は台帳に残る。紹介状があるなら、先にギルドへ見せるといい。"] },
-  alley_broker: { speaker: "情報屋", lines: ["表通りで買えないものは、だいたいここに流れてくる。だが、身元のない客ほど高くつく。"] },
-  blacksmith: { speaker: "鍛冶職人", lines: ["武器は持ち主の信用も背負う。登録前の客には、刃を研ぐだけでも保証人が要る。"] },
-  innkeeper: { speaker: "宿屋の女将", lines: ["部屋は空いてるよ。ただし長逗留ならギルド証か教会の確認書を見せてもらう。"] }
+const ROAD_LINES = {
+  vertical: [-430, -330, -130, 0, 130, 330, 430],
+  horizontal: [-430, -330, -130, 0, 130, 330, 430]
 };
 
-const state = {
-  player: { stamina: 100, maxStamina: 100, ...structuredClone(data.player) },
-  quest: structuredClone(data.quests), map: debugStartMap || data.startMap || "forestRoad",
-  keys: new Set(), yaw: 0, pitch: .06, cameraMode: "third", debug: false,
-  started: false, dragging: false, lastX: 0, lastY: 0, activeTarget: null,
-  inDialogue: false, dialogueId: null, dialogueLine: 0, selectedChoice: 0, choiceCooldown: 0,
-  padButtons: [], isDashing: false, dodgeTimer: 0, castCooldown: 0, castMaxCooldown: .28,
-  fireCooldown: 0, burstCooldown: 0, fireMaxCooldown: .32, burstMaxCooldown: .95,
-  cameraShake: 0, hitStop: 0, magicPulse: 0, quality: initialQuality
+const basePlayer = data.player || { name: "ユウジ・サトウ", hp: 200, maxHp: 200, mp: 25, maxMp: 25, rank: "未登録", contract: "未契約" };
+const questSeed = [
+  ...(data.quests || []),
+  { id: "gate", text: "北門で検問を通過する", done: false },
+  { id: "plaza", text: "中央広場で王都の構造を確認する", done: false },
+  { id: "guild_apply", text: "ギルド受付で登録申請をする", done: false },
+  { id: "mana_test", text: "魔力測定水晶に触れる", done: false },
+  { id: "provisional", text: "F級仮登録を受ける", done: false },
+  { id: "church_record", text: "教会で身分記録の手続きを聞く", done: false },
+  { id: "market", text: "市場通りの盗難騒ぎを確認する", done: false },
+  { id: "training", text: "外門練習場で火球を試射する", done: false },
+  { id: "mock_battle", text: "翌日の模擬戦に勝つ", done: false },
+  { id: "alley", text: "怪しい路地裏で情報屋に接触する", done: false }
+];
+const quests = [...new Map(questSeed.map((q) => [q.id, { ...q }])).values()];
+
+const DIALOGUES = {
+  wake_after: { speaker: "ユウジ", lines: ["湿った街道の土。遠くに王都の城壁が見える。", "まずは荷車の現場と北門を確認する。"] },
+  caravan_attack: { speaker: "襲われた商人", lines: ["た、助けてくれ！　黒毛の噛み犬が荷を荒らしている！", "護衛は倒れた。火でも音でもいい、あいつを退かせてくれ！"], choices: [{ text: "ファイアボールで獣を止める", done: ["caravan", "merchant"], effect: "fire", objective: "商人の紹介状を持って北門へ向かう" }, { text: "石を投げて注意をそらす", done: ["caravan", "merchant"], objective: "商人の紹介状を持って北門へ向かう" }] },
+  caravan_after: { speaker: "商人", lines: ["本当に助かった。これは紹介状だ。王都のギルド受付に出すといい。", "この街では、腕前より先に身元を示す紙が必要になる。"] },
+  north_gate: { speaker: "北門衛兵", lines: ["止まれ。王都アウレリアに入る者は、名と目的を言え。", "紹介状があるなら冒険者ギルドへ。大通りを南へ進み、噴水を越えろ。"], choices: [{ text: "王都へ入る", done: ["gate"], targetMap: "plaza", spawn: { x: 0, z: 610 }, objective: "中央広場を抜けて冒険者ギルドへ向かう" }] },
+  north_gate_after: { speaker: "北門衛兵", lines: ["一度入城確認をした旅人だな。", "王都へ戻るなら通れ。騒ぎは起こすなよ。"], choices: [{ text: "王都へ入る", targetMap: "plaza", spawn: { x: 0, z: 610 }, objective: "王都内で次の目的を進める" }] },
+  plaza: { speaker: "ユウジ", lines: ["城壁の内側に家が押し込まれている。大通りには馬車、脇道には市場、遠くには王城。", "建物は道に正面を向けて並び、裏側には狭い生活路地が続いている。", "身分、信用、金、信仰で居場所が分かれている。ここはゲームの街というより、社会だ。"], choices: [{ text: "地図感覚を整理する", done: ["plaza"], objective: "冒険者ギルドで紹介状を出す" }] },
+  plaza_after: { speaker: "ユウジ", lines: ["中央広場の位置関係は分かった。北に門、東に市場と職人区、西に教会、南に王城。", "次は目的地へ向かう。"] },
+  guild: { speaker: "ギルド案内係", lines: ["登録なら中だ。紹介状があるなら受付へ。", "王都の中では力より先に紙が物を言う。"], choices: [{ text: "ギルド内部へ入る", targetMap: "guildHall", spawn: { x: 0, z: 6.4 }, objective: "受付で登録申請をする" }] },
+  guild_reception: { speaker: "ギルド受付", lines: ["紹介状、確認しました。ユウジ・サトウさんですね。", "身分は仮扱いになります。登録には魔力測定と簡単な聞き取りが必要です。", "水晶に手を置いてください。色が出れば適性、濁れば要確認、割れれば……通常は測定器の故障です。"], choices: [{ text: "魔力測定へ進む", done: ["guild_apply"], to: "mana_measure", objective: "測定台の水晶に手を置く" }] },
+  guild_reception_after: { speaker: "ギルド受付", lines: ["登録申請は受理されています。", "次は魔力測定、またはギルドマスターの判断を確認してください。"] },
+  mana_measure: { speaker: "測定係", lines: ["水晶に触れた瞬間、淡い光が内部へ吸い込まれていく。", "色は変わらない。だが、奥の方から細い亀裂が走った。", "受付が顔を上げる。『……過負荷です。ですが、外側は割れていません』"], choices: [{ text: "水晶から手を離す", done: ["mana_test"], set: { "player.rank": "F級仮登録" }, effect: "crystal", to: "guildmaster", objective: "ギルドマスターの判断を聞く" }] },
+  mana_after: { speaker: "測定係", lines: ["水晶の奥には細い亀裂が残っている。", "同じ測定を繰り返すのは危険です。判断はギルドマスターに任されています。"] },
+  guildmaster: { speaker: "ギルドマスター", lines: ["荒削りだが、魔力の通り方が妙だ。才能はある。だが、常識がない。", "王都で無許可に火球を撃てば、魔物より先に衛兵に囲まれる。", "F級仮登録を認める。明日の模擬戦で、最低限の制御を見せろ。今日は外門練習場で練習しておけ。"], choices: [{ text: "F級仮登録を受け取る", done: ["provisional"], targetMap: "plaza", spawn: { x: 135, z: -42 }, objective: "外門練習場で魔法制御を練習する" }] },
+  guildmaster_after: { speaker: "ギルドマスター", lines: ["仮登録は出した。次は外門練習場だ。", "力を見せるより、制御できると証明してこい。"] },
+  church: { speaker: "教会記録係", lines: ["洗礼記録、出生記録、移住記録。この街では記録がない人は“いない人”に近い扱いです。", "紹介状があるなら仮の確認書は作れます。正式な身分には保証人が必要です。"], choices: [{ text: "確認書を頼む", done: ["church_record", "church"], set: { "player.contract": "教会確認書" }, objective: "ギルドへ戻って仮登録を進める" }] },
+  church_after: { speaker: "教会記録係", lines: ["仮の確認書は発行済みです。", "正式な保証人が見つかるまでは、ギルド証と併せて使ってください。"] },
+  market: { speaker: "市場の商人", lines: ["おい、旅人。薬草束がひとつ消えた。", "犯人を決めつけると商売が壊れる。見たなら教えてくれ。"], choices: [{ text: "盗難騒ぎを記録する", done: ["market"], objective: "教会かギルドで身分確認を進める" }, { text: "路地裏の噂を聞く", objective: "怪しい路地裏で情報屋に接触する" }] },
+  market_after: { speaker: "市場の商人", lines: ["さっきの騒ぎは落ち着いた。", "王都の市場では、正義感だけでは商売にならない。証拠と信用がいる。"] },
+  training_gate: { speaker: "訓練場の衛兵", lines: ["魔法の試射か。街中でやられるよりは助かる。", "的は奥だ。教官の指示を聞け。"], choices: [{ text: "外門練習場へ入る", targetMap: "trainingGround", spawn: { x: 0, z: 48 }, objective: "訓練教官から火球制御を学ぶ" }] },
+  training: { speaker: "訓練教官", lines: ["街中で火球を撃つな。試すならここだ。", "的を見ろ。息を止めるな。恥ずかしい詠唱でも、出るなら使え。", "威力より、狙った場所で止めることを覚えろ。"], choices: [{ text: "火球を試射する", done: ["training"], effect: "fire", objective: "翌日の模擬戦を受ける" }] },
+  training_after: { speaker: "訓練教官", lines: ["さっきよりは狙いがまともになった。", "模擬戦では威力ではなく、相手の動きを止める使い方をしろ。"] },
+  mock_battle: { speaker: "試験官", lines: ["翌日。木剣を持った新人冒険者が前に出る。", "相手は速くない。だが、こちらが火球を外せば距離を詰められる。", "ユウジは小さな火球で足元を牽制し、相手の踏み込みを止めた。勝負あり。"], choices: [{ text: "模擬戦を終える", done: ["mock_battle"], set: { "player.rank": "F級冒険者" }, targetMap: "plaza", spawn: { x: 135, z: -42 }, objective: "ギルドへ戻り、正式な次の依頼を受ける" }] },
+  mock_after: { speaker: "試験官", lines: ["模擬戦は終了だ。", "F級冒険者として、まずは王都内の小さな依頼から始めろ。"] },
+  alley: { speaker: "路地裏の男", lines: ["よそ者だな。ここでは金より身元が高く売れる。", "黒い羽を見たら拾うな。割れた水晶を見ても触るな。"], choices: [{ text: "情報だけ覚えて戻る", done: ["alley"], objective: "ギルドか教会で正式な足場を作る" }] },
+  alley_after: { speaker: "路地裏の男", lines: ["同じ噂を二度売るほど落ちぶれてはいない。", "次に来るなら、新しい話か、金を持ってこい。"] },
+  blacksmith: { speaker: "鍛冶職人", lines: ["登録前の客に刃物は売れない。腕より先に信用を持ってこい。"] },
+  inn: { speaker: "宿屋の女将", lines: ["部屋はあるよ。長逗留ならギルド証か教会の確認書を見せておくれ。"] },
+  generic: { speaker: "通行人", lines: ["王都は広い。看板と鐘楼を目印にしな。"] }
 };
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, .1, 950);
-const renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: true });
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 1600);
+const renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: true, powerPreference: "high-performance" });
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, activeQuality.pixelRatio));
-renderer.shadowMap.enabled = true;
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, quality.pixelRatio));
+renderer.shadowMap.enabled = quality.shadow;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 1.05;
 
 const world = new THREE.Group();
 scene.add(world);
 const clock = new THREE.Clock();
-const player = createPlayer();
+const mats = new Map();
+const geoCache = new Map();
+const texCache = new Map();
+const player = createPerson("player", 0x24395d);
 scene.add(player);
 
-let npcs = [];
-let locations = [];
-let colliders = [];
-let movers = [];
-let bounds = { minX: -85, maxX: 85, minZ: -125, maxZ: 125 };
-let caravan = null;
-let beast = null;
-let merchant = null;
-let sunLight = null;
+const state = { started: false, loaded: false, map: null, keys: new Set(), yaw: 0, pitch: 0.08, cameraMode: "third", debug: params.has("debug"), player: { stamina: 100, maxStamina: 100, ...basePlayer }, quest: quests, active: null, inDialogue: false, dialogueId: null, lineIndex: 0, selected: 0, padButtons: [], fireCooldown: 0, burstCooldown: 0, isDashing: false, drag: false, lastX: 0, lastY: 0, shake: 0, hitStop: 0 };
+let bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 };
+let colliders = [], locations = [], npcs = [], movers = [], cullables = [], projectiles = [], bursts = [];
 let colliderGrid = new Map();
-let cullTimer = 0;
-const projectiles = [];
-const bursts = [];
-const tempLights = [];
-const cullables = [];
-const instanceQueues = new Map();
-const GRID_SIZE = 12;
-const INSTANCE_BUCKET_SIZE = 70;
-const PRIMARY_SHADOW_LABELS = new Set(["castle","castleKeep","castleTower","guildDoor","churchStone","buttress","caravan"]);
+let facadeSpecs = [], plainSpecs = [];
+const GRID_SIZE = 18;
 
 initLights();
-loadMap(state.map, initialSpawn(state.map));
+bindQualitySelect();
+bindStartEarly();
 updateHud();
-setTimeout(() => ui.loading.classList.add("is-hidden"), 250);
+ui.loading?.classList.add("is-hidden");
 requestAnimationFrame(loop);
-exposeDebugApi();
 
-function exposeDebugApi(){
-  if(!bootParams.has("debug")) return;
-  window.__AURELIA_DEBUG__ = {
-    state, player, loadMap, tryMove, castFireball, toggleCamera, colliderAt,
-    setPlayer(x,z){ player.position.set(x,0,z); },
-    counts(){ return { map:state.map, quality:state.quality, colliders:colliders.length, gridCells:colliderGrid.size, movers:movers.length, npcs:npcs.length, cullables:cullables.length, locations:locations.length, projectiles:projectiles.length }; },
-    sampleMovers(){ return movers.slice(0,5).map(m=>({ type:m.type, x:+m.object.position.x.toFixed(2), z:+m.object.position.z.toFixed(2) })); },
-    locations(){ return locations.map(l=>({ id:l.id, targetMap:l.targetMap || null, x:l.position.x, z:l.position.z })); }
-  };
-}
-
-function initialSpawn(id){
-  return ({ forestRoad: data.startSpawn || { x: 0, z: 74 }, plaza: { x: 0, z: 185 }, guildHall: { x: 0, z: 6.4 }, church: { x: 0, z: 5.5 }, trainingGround: { x: 0, z: 48 } })[id] || data.startSpawn || { x: 0, z: 74 };
-}
-function initLights(){
-  scene.add(new THREE.HemisphereLight(0xf7eddb, 0x28364a, 2.75));
-  const sun = new THREE.DirectionalLight(0xfff0ce, 3.2);
-  sunLight = sun;
-  sun.position.set(40,70,30);
-  sun.castShadow = activeQuality.shadows;
-  sun.shadow.mapSize.set(2048,2048);
-  Object.assign(sun.shadow.camera,{ near:.5, far:260, left:-135, right:135, top:135, bottom:-135 });
-  scene.add(sun);
-  applyQuality(state.quality, false);
-}
-function mat(color, rough=.82, em=0x000000, power=0){
-  return new THREE.MeshStandardMaterial({ color, roughness: rough, emissive: em, emissiveIntensity: power, flatShading: true });
-}
-function add(geo, material, parent=world, cast=true, receive=true){
-  const m = new THREE.Mesh(geo, material);
-  m.castShadow = Boolean(cast && activeQuality.shadows && parent?.userData?.shadowPriority);
-  m.receiveShadow = receive;
-  parent.add(m);
-  return m;
-}
-function shouldCastShadow(label="", parent=world, preferred=true){
-  return Boolean(preferred && activeQuality.shadows && (parent?.userData?.shadowPriority || PRIMARY_SHADOW_LABELS.has(label)));
-}
-function setModelShadow(root, enabled){
-  root.traverse?.(o => {
-    if(o.isMesh){
-      o.castShadow = Boolean(enabled && activeQuality.shadows);
-      o.receiveShadow = true;
-    }
+function bindQualitySelect() {
+  if (!ui.quality) return;
+  ui.quality.value = qualityMode;
+  ui.quality.addEventListener("change", () => {
+    const next = ui.quality.value;
+    const url = new URL(location.href);
+    url.searchParams.set(params.has("quality") ? "quality" : "render", next);
+    location.assign(url.toString());
   });
 }
-function rand(a,b){ return a + Math.random() * (b-a); }
-function pick(arr){ return arr[Math.floor(rand(0,arr.length))]; }
-function questDone(id){ return state.quest.some(q => q.id === id && q.done); }
-
-function loadMap(id, spawn){
-  state.map = id;
-  world.clear();
-  npcs.forEach(n => scene.remove(n));
-  npcs = []; locations = []; colliders = []; movers = [];
-  colliderGrid = new Map(); cullables.length = 0; instanceQueues.clear(); cullTimer = 0;
-  caravan = beast = merchant = null;
-  projectiles.length = 0; bursts.length = 0; tempLights.length = 0;
-
-  ({ forestRoad: buildForestRoad, plaza: buildKingdom, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround }[id] || buildKingdom)();
-  flushInstancedProps();
-
-  const md = data.maps[id];
-  locations = (md.locations || []).map(l => ({ ...l, kind: l.targetMap ? "door" : "spot" }));
-  if(id === "plaza"){
-    locations.push(
-      { id: "fountain", name: "噴水広場を調べる", position: { x: 0, z: 0 }, dialogue: "fountain_hint", radius: 4.0, kind: "spot" },
-      { id: "shady_alley", name: "怪しい路地裏に入る", position: { x: -148, z: 72 }, dialogue: "shady_alley", radius: 4.0, kind: "spot" }
-    );
-  }
-  locations.forEach(addMarker);
-  (md.npcs || []).forEach(addNpc);
-
-  player.position.set(spawn.x, spawn.y || 0, spawn.z);
-  updateCulling(true);
-  updateHud();
-}
-function env(color, near, far){ scene.background = new THREE.Color(color); scene.fog = new THREE.Fog(color, near, far); }
-function gridKey(cx,cz){ return `${cx},${cz}`; }
-function addCollider(x,z,w,d,label=""){
+function bindStartEarly() { const start = () => { if (state.started) return; state.started = true; ui.title?.classList.add("is-hidden"); ui.loading?.classList.remove("is-hidden"); setTimeout(() => { const map = params.get("map") || data.startMap || "forestRoad"; loadMap(map, initialSpawn(map)); state.loaded = true; ui.loading?.classList.add("is-hidden"); }, 30); }; ui.start?.addEventListener("click", start); ui.start?.addEventListener("pointerup", (e) => { e.preventDefault(); start(); }); }
+function initLights() { scene.add(new THREE.HemisphereLight(0xf0e6cf, 0x415063, 1.95)); const sun = new THREE.DirectionalLight(0xfff1d6, 2.55); sun.position.set(90, 135, 70); sun.castShadow = quality.shadow; sun.shadow.mapSize.set(1536, 1536); sun.shadow.bias = -0.0004; Object.assign(sun.shadow.camera, { near: .5, far: 620, left: -390, right: 390, top: 390, bottom: -390 }); scene.add(sun); scene.add(new THREE.AmbientLight(0x556070, .5)); }
+function initialSpawn(map) { return ({ forestRoad: { x: 0, z: 74 }, plaza: { x: 0, z: 610 }, guildHall: { x: 0, z: 6.2 }, church: { x: 0, z: 5.5 }, trainingGround: { x: 0, z: 48 } })[map] || { x: 0, z: 74 }; }
+function mat(color, rough = .82, em = 0x000000, pow = 0) { const k = `${color}:${rough}:${em}:${pow}`; if (!mats.has(k)) mats.set(k, new THREE.MeshStandardMaterial({ color, roughness: rough, emissive: em, emissiveIntensity: pow, flatShading: true })); return mats.get(k); }
+function add(geo, material, parent = world, cast = false, receive = true) { const m = new THREE.Mesh(geo, material); m.castShadow = Boolean(cast && quality.shadow); m.receiveShadow = receive; parent.add(m); return m; }
+function rand(a, b) { return a + Math.random() * (b - a); }
+function pick(a) { return a[Math.floor(rand(0, a.length))]; }
+function done(id) { return state.quest.some((q) => q.id === id && q.done); }
+function setEnv(color, near, far) { scene.background = new THREE.Color(color); scene.fog = new THREE.Fog(color, near, far); }
+function gridKey(x, z) { return `${x},${z}`; }
+function addCollider(x, z, w, d, label = "") {
   const c = { x, z, w, d, label };
   colliders.push(c);
-  const minX=Math.floor((x-w/2)/GRID_SIZE), maxX=Math.floor((x+w/2)/GRID_SIZE);
-  const minZ=Math.floor((z-d/2)/GRID_SIZE), maxZ=Math.floor((z+d/2)/GRID_SIZE);
-  for(let gx=minX; gx<=maxX; gx++){
-    for(let gz=minZ; gz<=maxZ; gz++){
-      const key=gridKey(gx,gz);
-      if(!colliderGrid.has(key)) colliderGrid.set(key, []);
-      colliderGrid.get(key).push(c);
-    }
+  const minX = Math.floor((x - w / 2) / GRID_SIZE), maxX = Math.floor((x + w / 2) / GRID_SIZE);
+  const minZ = Math.floor((z - d / 2) / GRID_SIZE), maxZ = Math.floor((z + d / 2) / GRID_SIZE);
+  for (let gx = minX; gx <= maxX; gx++) for (let gz = minZ; gz <= maxZ; gz++) {
+    const key = gridKey(gx, gz);
+    if (!colliderGrid.has(key)) colliderGrid.set(key, []);
+    colliderGrid.get(key).push(c);
   }
-  return c;
 }
-function nearbyColliders(x,z,r){
-  const minX=Math.floor((x-r)/GRID_SIZE), maxX=Math.floor((x+r)/GRID_SIZE);
-  const minZ=Math.floor((z-r)/GRID_SIZE), maxZ=Math.floor((z+r)/GRID_SIZE);
-  const seen=new Set(), out=[];
-  for(let gx=minX; gx<=maxX; gx++){
-    for(let gz=minZ; gz<=maxZ; gz++){
-      const cell=colliderGrid.get(gridKey(gx,gz));
-      if(!cell) continue;
-      for(const c of cell){ if(!seen.has(c)){ seen.add(c); out.push(c); } }
-    }
+function nearbyColliders(x, z, r = .58) {
+  const minX = Math.floor((x - r) / GRID_SIZE), maxX = Math.floor((x + r) / GRID_SIZE);
+  const minZ = Math.floor((z - r) / GRID_SIZE), maxZ = Math.floor((z + r) / GRID_SIZE);
+  const seen = new Set(), out = [];
+  for (let gx = minX; gx <= maxX; gx++) for (let gz = minZ; gz <= maxZ; gz++) {
+    const cell = colliderGrid.get(gridKey(gx, gz));
+    if (!cell) continue;
+    for (const c of cell) if (!seen.has(c)) { seen.add(c); out.push(c); }
   }
   return out;
 }
-function colliderAt(x,z,r=.58, dynamic=true){
-  for(const c of nearbyColliders(x,z,r)){
-    if(x > c.x - c.w/2 - r && x < c.x + c.w/2 + r && z > c.z - c.d/2 - r && z < c.z + c.d/2 + r) return c;
-  }
-  if(dynamic){
-    for(const m of movers){
-      const rr=(m.radius || (m.type==="cart"?2.15:.68)) + r;
-      if(Math.hypot(x-m.object.position.x,z-m.object.position.z)<rr) return m;
-    }
-    for(const n of npcs){
-      if(n.visible===false) continue;
-      const rr=(n.userData?.radius || .72) + r;
-      if(Math.hypot(x-n.position.x,z-n.position.z)<rr) return n.userData || n;
-    }
-  }
-  return null;
-}
-function isBlocked(x,z,r=.58){ return Boolean(colliderAt(x,z,r,true)); }
-function placeBox(x,y,z,w,h,d,color,label="",parent=world){
-  const m = add(new THREE.BoxGeometry(w,h,d), mat(color), parent);
-  m.position.set(x,y,z);
-  m.castShadow = shouldCastShadow(label,parent,true);
-  if(parent === world && label) addCollider(x,z,w,d,label);
-  return m;
-}
-function placeCylinder(x,y,z,r,h,color,label="",parent=world){
-  const m = add(new THREE.CylinderGeometry(r,r,h,12), mat(color), parent);
-  m.position.set(x,y,z);
-  m.castShadow = shouldCastShadow(label,parent,true);
-  if(parent === world && label) addCollider(x,z,r*2,r*2,label);
-  return m;
-}
-function ground(w,d,color){
-  const g = add(new THREE.PlaneGeometry(w,d), mat(color,.95), world, false, true);
-  g.rotation.x = -Math.PI/2;
-  return g;
-}
-function addRoad(x,z,w,d,color=0x6f6657){
-  const r = placeBox(x,.03,z,w,.04,d,color);
-  r.receiveShadow = true;
-  return r;
-}
-function registerCullable(object, type="prop", x=object.position.x, z=object.position.z, multiplier=1){
-  object.userData.cullType = type;
-  cullables.push({ object, type, x, z, multiplier });
-  return object;
-}
-function updateCulling(force=false, dt=.22){
-  if(!force && (cullTimer-=dt)>0) return;
-  cullTimer = .22;
-  const px=player.position.x, pz=player.position.z;
-  for(const item of cullables){
-    const range=(activeQuality.cull[item.type] || activeQuality.cull.prop) * item.multiplier;
-    item.object.visible = state.debug || Math.hypot(px-item.x,pz-item.z) <= range;
-  }
-  for(const n of npcs){
-    const range=activeQuality.cull.npc;
-    n.visible = state.debug || Math.hypot(px-n.position.x,pz-n.position.z) <= range;
-  }
-  for(const m of movers){
-    const range=m.type==="cart" ? activeQuality.cull.cart : activeQuality.cull.npc;
-    m.object.visible = state.debug || Math.hypot(px-m.object.position.x,pz-m.object.position.z) <= range;
-  }
-}
-function instanceKey(kind,color,x,z){
-  return `${kind}:${color}:${Math.floor(x/INSTANCE_BUCKET_SIZE)}:${Math.floor(z/INSTANCE_BUCKET_SIZE)}`;
-}
-function instanceGeometry(kind){
-  if(kind==="box") return new THREE.BoxGeometry(1,1,1);
-  if(kind==="cylinder") return new THREE.CylinderGeometry(1,1,1,8);
-  return new THREE.DodecahedronGeometry(1,0);
-}
-function queueInstance(kind,color,x,y,z,sx,sy,sz,type="prop"){
-  const key=instanceKey(kind,color,x,z);
-  if(!instanceQueues.has(key)) instanceQueues.set(key,{ kind, color, type, matrices:[], x:0, z:0 });
-  const q=instanceQueues.get(key);
-  const matrix=new THREE.Matrix4();
-  matrix.compose(new THREE.Vector3(x,y,z), new THREE.Quaternion(), new THREE.Vector3(sx,sy,sz));
-  q.matrices.push(matrix); q.x+=x; q.z+=z;
-}
-function flushInstancedProps(){
-  for(const q of instanceQueues.values()){
-    const mesh=new THREE.InstancedMesh(instanceGeometry(q.kind), mat(q.color,.9), q.matrices.length);
-    q.matrices.forEach((m,i)=>mesh.setMatrixAt(i,m));
-    mesh.instanceMatrix.needsUpdate=true;
-    mesh.castShadow=false;
-    mesh.receiveShadow=true;
-    world.add(mesh);
-    registerCullable(mesh,q.type,q.x/q.matrices.length,q.z/q.matrices.length,1.15);
-  }
-  instanceQueues.clear();
-}
-function addRock(x,z,s=.55){
-  queueInstance("rock",0x6b6b62,x,.16,z,s,s*rand(.45,.9),s,"prop");
-  addCollider(x,z,.8*s,.8*s,"rock");
-}
+function blocked(x, z, r = .58) { for (const c of nearbyColliders(x, z, r)) if (x > c.x - c.w / 2 - r && x < c.x + c.w / 2 + r && z > c.z - c.d / 2 - r && z < c.z + c.d / 2 + r) return true; for (const m of movers) if (Math.hypot(x - m.obj.position.x, z - m.obj.position.z) < (m.r || .7) + r) return true; return false; }
+function cull(obj, x, z, range = 340) { cullables.push({ obj, x, z, range }); return obj; }
+function boxGeo(w, h, d) { const k = `b${w.toFixed(2)}:${h.toFixed(2)}:${d.toFixed(2)}`; let g = geoCache.get(k); if (!g) { g = new THREE.BoxGeometry(w, h, d); geoCache.set(k, g); } return g; }
+function cylGeo(r, h, seg = 12) { const k = `c${r.toFixed(2)}:${h.toFixed(2)}:${seg}`; let g = geoCache.get(k); if (!g) { g = new THREE.CylinderGeometry(r, r, h, seg); geoCache.set(k, g); } return g; }
+function unitGable() { let g = geoCache.get("gable"); if (!g) { const s = new THREE.Shape(); s.moveTo(-1, 0); s.lineTo(1, 0); s.lineTo(0, 1); s.closePath(); g = new THREE.ShapeGeometry(s); geoCache.set("gable", g); } return g; }
+// 単位三角プリズム（屋根用）: 幅1, 高さ1, 奥行1, 棟はz軸方向。インスタンス化で家ごとに拡大縮小する。
+const YAXIS = new THREE.Vector3(0, 1, 0);
+function prismGeo() { let g = geoCache.get("prism"); if (g) return g; const v = new Float32Array([-.5, 0, .5, .5, 0, .5, 0, 1, .5, -.5, 0, -.5, .5, 0, -.5, 0, 1, -.5]); g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(v, 3)); g.setIndex([0, 1, 2, 3, 5, 4, 0, 2, 5, 0, 5, 3, 1, 4, 5, 1, 5, 2, 0, 3, 4, 0, 4, 1]); g.computeVertexNormals(); geoCache.set("prism", g); return g; }
+function facadeTex() { if (texCache.has("facade")) return texCache.get("facade"); const c = document.createElement("canvas"); c.width = 128; c.height = 160; const x = c.getContext("2d"); x.fillStyle = "#cdb189"; x.fillRect(0, 0, 128, 160); x.strokeStyle = "#5a4128"; x.lineWidth = 7; x.strokeRect(4, 4, 120, 152); x.beginPath(); x.moveTo(64, 4); x.lineTo(64, 38); x.moveTo(20, 40); x.lineTo(108, 40); x.moveTo(20, 96); x.lineTo(108, 96); x.stroke(); x.fillStyle = "#3a2a18"; x.fillRect(18, 52, 32, 34); x.fillRect(78, 52, 32, 34); x.fillStyle = "#ffd98a"; x.fillRect(22, 56, 24, 26); x.fillRect(82, 56, 24, 26); x.strokeStyle = "#3a2a18"; x.lineWidth = 3; x.beginPath(); x.moveTo(34, 56); x.lineTo(34, 82); x.moveTo(22, 69); x.lineTo(46, 69); x.moveTo(94, 56); x.lineTo(94, 82); x.moveTo(82, 69); x.lineTo(106, 69); x.stroke(); x.fillStyle = "#4a3018"; x.fillRect(48, 104, 32, 52); x.fillStyle = "#2a1c10"; x.fillRect(52, 108, 24, 48); const t = new THREE.CanvasTexture(c); texCache.set("facade", t); return t; }
+function instMat(k, opts) { if (mats.has(k)) return mats.get(k); const m = new THREE.MeshStandardMaterial(opts); mats.set(k, m); return m; }
+function buildHouseBatch(specs, facade) { if (!specs.length) return; const n = specs.length; const body = new THREE.InstancedMesh(boxGeo(1, 1, 1), instMat("instBody", { color: 0xffffff, roughness: .92, flatShading: true }), n); const roof = new THREE.InstancedMesh(prismGeo(), instMat("instRoof", { color: 0xffffff, roughness: .85, flatShading: true }), n); const fac = facade ? new THREE.InstancedMesh(boxGeo(1, 1, .14), instMat("instFacade", { map: facadeTex(), roughness: .9 }), n) : null; const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), O = new THREE.Vector3(), cb = new THREE.Color(), cr = new THREE.Color(); specs.forEach((s, i) => { Q.setFromAxisAngle(YAXIS, s.angle); const y = s.y || 0, rh = s.rh || s.w * .34; P.set(s.x, y + s.h / 2, s.z); S.set(s.w, s.h, s.d); M.compose(P, Q, S); body.setMatrixAt(i, M); body.setColorAt(i, cb.setHex(s.body)); P.set(s.x, y + s.h, s.z); S.set(s.w * 1.05, rh, s.d * 1.08); M.compose(P, Q, S); roof.setMatrixAt(i, M); roof.setColorAt(i, cr.setHex(s.roof)); if (fac) { O.set(0, 0, s.d / 2 + .08).applyQuaternion(Q); P.set(s.x + O.x, y + s.h * .47, s.z + O.z); S.set(s.w * .94, s.h * .92, .16); M.compose(P, Q, S); fac.setMatrixAt(i, M); } }); for (const m of [body, roof, fac]) { if (!m) continue; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.castShadow = false; m.receiveShadow = true; m.matrixAutoUpdate = false; m.matrixWorldAutoUpdate = false; world.add(m); } }
+function paintTexture(g, kind) { const R = (a, b) => a + Math.random() * (b - a); if (kind === "grass") { g.fillStyle = "#3c5639"; g.fillRect(0, 0, 128, 128); for (let i = 0; i < 1100; i++) { g.fillStyle = `hsl(${R(82, 122)},${R(28, 46)}%,${R(20, 40)}%)`; g.fillRect(R(0, 128), R(0, 128), R(1, 2.4), R(2, 5)); } return; } if (kind === "cobble") { g.fillStyle = "#2c271f"; g.fillRect(0, 0, 128, 128); for (let ry = 0; ry < 8; ry++) for (let rx = 0; rx < 8; rx++) { const off = (ry % 2) * 8, x = rx * 16 + off, y = ry * 16, dark = Math.random() < .3; g.fillStyle = `hsl(${R(22, 42)},${R(8, 18)}%,${dark ? R(20, 30) : R(33, 47)}%)`; round(g, x + 1.9, y + 1.9, 12.2, 12.2, 5); g.fill(); g.fillStyle = "rgba(255,255,255,.05)"; round(g, x + 2.6, y + 2.6, 5, 4, 2); g.fill(); } return; } if (kind === "dirt") { g.fillStyle = "#6b5942"; g.fillRect(0, 0, 128, 128); for (let i = 0; i < 800; i++) { g.fillStyle = `hsl(${R(24, 40)},${R(18, 36)}%,${R(26, 46)}%)`; g.fillRect(R(0, 128), R(0, 128), R(1, 3), R(1, 3)); } return; } if (kind === "stone") { g.fillStyle = "#46453d"; g.fillRect(0, 0, 128, 128); for (let ry = 0; ry < 4; ry++) for (let rx = 0; rx < 4; rx++) { const off = (ry % 2) * 16; g.fillStyle = `hsl(${R(34, 50)},${R(4, 10)}%,${R(40, 54)}%)`; round(g, rx * 32 + off + 2, ry * 32 + 2, 28, 28, 3); g.fill(); } return; } if (kind === "plank") { for (let i = 0; i < 8; i++) { g.fillStyle = `hsl(${R(22, 34)},${R(34, 50)}%,${R(22, 36)}%)`; g.fillRect(i * 16, 0, 16, 128); g.fillStyle = "rgba(0,0,0,.22)"; g.fillRect(i * 16, 0, 1.6, 128); } return; } g.fillStyle = "#555"; g.fillRect(0, 0, 128, 128); }
+function texFor(kind) { if (texCache.has(kind)) return texCache.get(kind); const c = document.createElement("canvas"); c.width = c.height = 128; paintTexture(c.getContext("2d"), kind); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; texCache.set(kind, t); return t; }
+function surfaceMat(kind, repX, repZ) { const k = `surf:${kind}:${repX.toFixed(1)}:${repZ.toFixed(1)}`; if (mats.has(k)) return mats.get(k); const t = texFor(kind).clone(); t.needsUpdate = true; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repX, repZ); const m = new THREE.MeshStandardMaterial({ map: t, roughness: .95 }); mats.set(k, m); return m; }
+function box(x, y, z, w, h, d, color, label = "", parent = world, important = false) { const m = add(boxGeo(w, h, d), mat(color), parent, important); m.position.set(x, y, z); if (parent === world && label) addCollider(x, z, w, d, label); if (parent === world) cull(m, x, z, important ? 900 : 350); return m; }
+function cyl(x, y, z, r, h, color, label = "", parent = world, important = false) { const m = add(cylGeo(r, h), mat(color), parent, important); m.position.set(x, y, z); if (parent === world && label) addCollider(x, z, r * 2, r * 2, label); if (parent === world) cull(m, x, z, important ? 900 : 350); return m; }
+function ground(w, d, color, kind = "grass") { const g = add(new THREE.PlaneGeometry(w, d), surfaceMat(kind, w / 8, d / 8), world, false, true); g.rotation.x = -Math.PI / 2; return g; }
+function road(x, z, w, d, color = 0x766b5b, kind = "cobble") { const m = add(boxGeo(w, .05, d), surfaceMat(kind, Math.max(1, w / 4), Math.max(1, d / 4)), world, false, true); m.position.set(x, .03, z); cull(m, x, z, 900); return m; }
+function faceToward(dx, dz) { return Math.atan2(dx, dz); }
+function roadFacingAngle(x, z) { let best = { dist: Infinity, dx: 0, dz: 1 }; for (const rx of ROAD_LINES.vertical) { const dist = Math.abs(x - rx); if (dist < best.dist) best = { dist, dx: rx - x, dz: 0 }; } for (const rz of ROAD_LINES.horizontal) { const dist = Math.abs(z - rz); if (dist < best.dist) best = { dist, dx: 0, dz: rz - z }; } return faceToward(best.dx, best.dz || 0.0001); }
+function rotatedAabb(w, d, angle) { const c = Math.abs(Math.cos(angle)), s = Math.abs(Math.sin(angle)); return { w: w * c + d * s, d: w * s + d * c }; }
 
-function buildForestRoad(){
-  env(0x6f91a1, 38, 230);
-  bounds = { minX:-85, maxX:85, minZ:-125, maxZ:125 };
-  ground(190,270,0x35513d);
-  addRoad(0,0,9,250,0x746756);
+function loadMap(id, spawn) { state.map = id; world.clear(); npcs.forEach((n) => scene.remove(n)); npcs = []; movers = []; locations = []; colliders = []; colliderGrid = new Map(); cullables = []; projectiles = []; bursts = []; facadeSpecs = []; plainSpecs = []; ({ forestRoad: buildForestRoad, plaza: buildCity, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround }[id] || buildForestRoad)(); locations.forEach(addMarker); player.position.set(spawn.x, spawn.y || 0, spawn.z); updateHud(); updateCulling(); }
+function buildForestRoad() { setEnv(0x6f91a1, 40, quality.fog); bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 }; ground(210, 290, 0x35513d); road(0, 0, 9, 260, 0x746756, "dirt"); for (let z = -120; z <= 120; z += 18) { road(-15, z, 20, 3, 0x665b4f, "dirt"); road(16, z + 8, 18, 2.8, 0x665b4f, "dirt"); } for (let i = 0; i < Math.floor(180 * quality.houses); i++) addTree((Math.random() < .5 ? -1 : 1) * rand(12, 86), rand(-128, 128), rand(.8, 1.4), true); for (let i = 0; i < Math.floor(60 * quality.props); i++) addRock(rand(-85, 85), rand(-125, 125), rand(.3, .8)); addGate(0, -112); addCaravan(6, 15); addSign(7, -90, "ROYAL CAPITAL"); locations.push({ id: "gate", name: "北門の検問を受ける", x: 0, z: -108, r: 6, dialogue: "north_gate" }, { id: "caravan", name: done("merchant") ? "救助済みの荷車を見る" : "荷車襲撃現場を見る", x: 6, z: 15, r: 6, dialogue: "caravan_attack" }); for (let i = 0; i < 5; i++) addNpc("guard", rand(-8, 8), rand(-70, 45), 0xb77954, "北門衛兵", "north_gate"); }
+function buildCity() { setEnv(0xbcd6e6, 130, 1500); bounds = { minX: -680, maxX: 680, minZ: -680, maxZ: 680 }; ground(1420, 1420, 0x6f8a52, "grass"); const floor = add(new THREE.PlaneGeometry(1330, 1330), surfaceMat("dirt", 90, 90), world, false, true); floor.rotation.x = -Math.PI / 2; floor.position.y = .012; cityWall(); road(0, 0, 24, 1240, 0x817767); road(0, 0, 1240, 24, 0x817767); for (const z of [-330, -130, 130, 330, 430]) road(0, z, 980, 9, 0x6f6657); for (const x of [-430, -330, -130, 130, 330, 430]) road(x, 0, 9, 980, 0x6f6657); castleHill(); centralPlaza(); guildDistrict(135, -70); churchDistrict(-185, -85); marketDistrict(285, 85); craftDistrict(350, -125); nobleDistrict(-250, -350); slumDistrict(-410, 245); trainingDistrict(380, 330); gateDistrict(0, 610); cityFill(); buildHouseBatch(facadeSpecs, true); buildHouseBatch(plainSpecs, false); traffic(); pedestrians(); props(); streetDressing(); addSign(0, 610, "NORTH GATE"); addSign(135, -38, "GUILD"); addSign(-185, -48, "CHURCH"); addSign(285, 125, "MARKET"); addSign(-390, 235, "ALLEY"); addSign(0, -445, "CASTLE"); locations.push({ id: "plaza", name: "中央広場を見渡す", x: 0, z: 40, r: 12, dialogue: "plaza" }, { id: "guild", name: "冒険者ギルドに入る", x: 135, z: -60, r: 10, dialogue: "guild" }, { id: "market", name: "市場の盗難騒ぎを見る", x: 260, z: 95, r: 13, dialogue: "market" }, { id: "church", name: "教会記録所で相談する", x: -185, z: -70, r: 12, dialogue: "church" }, { id: "training", name: "外門練習場へ行く", x: 360, z: 330, r: 13, dialogue: "training_gate" }, { id: "alley", name: "怪しい路地裏に入る", x: -390, z: 235, r: 12, dialogue: "alley" }, { id: "blacksmith", name: "鍛冶屋に近づく", x: 330, z: -110, r: 9, dialogue: "blacksmith" }, { id: "inn", name: "宿屋を見る", x: 92, z: 82, r: 9, dialogue: "inn" }); }
+function buildGuildHall() { setEnv(0x1f1711, 12, 36); bounds = { minX: -8, maxX: 8, minZ: -7, maxZ: 7 }; ground(16, 15, 0x4c3727, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.9)); const torch = new THREE.PointLight(0xffb86a, 8, 22, 2); torch.position.set(0, 3.6, -2); world.add(torch); room(16, 15, 3.2, 0x3a281c); box(0, .55, -4.5, 6.4, 1.1, .9, 0x6b4a2f, "counter", world, true); box(0, 1.2, -6.2, 5.6, 2.4, .5, 0x5a3d27, "shelf", world, true); addQuestBoard(-5.6, -4.4); const crystal = add(new THREE.SphereGeometry(.45, 16, 10), mat(0x80d8ff, .2, 0x65cfff, .9), world, false, false); crystal.position.set(3.6, 1.15, -3.4); cull(crystal, 3.6, -3.4, 60); cyl(3.6, .55, -3.4, .32, .8, 0x62513a, "crystalBase", world, true); addNpc("receptionist", 0, -3.3, 0xd8b36b, "受付", "guild_reception"); addNpc("guildmaster", -3.8, -3.4, 0x4f5d6f, "ギルドマスター", "guildmaster"); addNpc("adventurer", -3.8, .9, 0x8c6f4f, "冒険者", "generic"); locations.push({ id: "reception", name: "受付で登録申請をする", x: 0, z: -3.3, r: 3, dialogue: "guild_reception" }, { id: "crystal", name: "魔力測定水晶に触れる", x: 3.6, z: -3.4, r: 2.6, dialogue: "mana_measure" }, { id: "guildmaster", name: "ギルドマスターと話す", x: -3.8, z: -3.4, r: 2.8, dialogue: "guildmaster" }, { id: "guild_exit", name: "王都へ戻る", x: 0, z: 6.7, r: 2.4, targetMap: "plaza", spawn: { x: 135, z: -42 } }); }
+function buildChurch() { setEnv(0x151823, 12, 36); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x5b5a55, "stone"); world.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1d28, 1.7)); const glow = new THREE.PointLight(0xbfd4ff, 6, 20, 2); glow.position.set(0, 3.4, -3); world.add(glow); room(14, 14, 4, 0x44434a); box(0, .55, -4.4, 3.8, 1.05, 1.25, 0xddd1ae, "altar", world, true); for (let i = 0; i < 4; i++) { box(-2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); box(2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); } addNpc("priest", 0, -2.5, 0xc9c4ad, "司祭", "church"); }
+function buildTrainingGround() { setEnv(0x88a6b4, 25, 180); bounds = { minX: -60, maxX: 60, minZ: -70, maxZ: 70 }; ground(130, 150, 0x556c4c); road(0, 0, 18, 130, 0x776b5a); for (let i = 0; i < 16; i++) cyl(rand(-35, 35), .85, rand(-40, 40), .25, 1.7, 0x7a5635, "target"); addSign(0, 48, "TO CAPITAL"); addNpc("guard", -8, 12, 0xb77954, "訓練教官", "training"); addNpc("adventurer", 10, -8, 0x6f8aa6, "模擬戦相手", "mock_battle"); locations.push({ id: "practice", name: "火球制御を練習する", x: -8, z: 12, r: 4, dialogue: "training" }, { id: "mock", name: "翌日の模擬戦を受ける", x: 10, z: -8, r: 4, dialogue: "mock_battle" }, { id: "training_exit", name: "王都へ戻る", x: 0, z: 52, r: 4, targetMap: "plaza", spawn: { x: 360, z: 305 } }); }
 
-  for(let z=-118; z<=118; z+=18){
-    addRoad(-15,z,20,3.2,0x665b4f);
-    addRoad(16,z+8,18,2.8,0x665b4f);
-  }
-  for(let i=0;i<260;i++){
-    const side = Math.random()<.5 ? -1 : 1;
-    const x = side * rand(12,82);
-    const z = rand(-124,124);
-    addTree(x,z,rand(.8,1.5), true);
-  }
-  for(let i=0;i<90;i++){
-    addRock(rand(-80,80),rand(-120,120),rand(.35,.8));
-  }
-  addGateModel(0,-112);
-  addCaravanScene(6, 15);
-  addWanderingGuards();
-  addSignPost(-6,82,"STATUS");
-  addSignPost(7,-90,"ROYAL CAPITAL");
-}
+function cityWall() { for (const [x, z, w, d] of [[0, -675, 1320, 10], [0, 675, 1320, 10], [-675, 0, 10, 1320], [675, 0, 10, 1320]]) box(x, 5, z, w, 10, d, 0x6d6c64, "wall", world, true); for (let i = -620; i <= 620; i += 75) { box(i, 10, -675, 10, 18, 10, 0x74736b, "tower", world, true); box(i, 10, 675, 10, 18, 10, 0x74736b, "tower", world, true); box(-675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); box(675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); } }
+function addGate(x, z) { box(x, 4, z, 38, 8, 7, 0x6d6c64, "gate", world, true); box(x - 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); box(x + 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); }
+function gateDistrict(x, z) { addGate(x, z + 55); for (let i = -2; i <= 2; i++) addNpc("guard", x + i * 6, z - 8, 0xb77954, "衛兵", "north_gate"); box(x - 22, 2, z - 25, 20, 4, 14, 0x6a5e52, "checkpoint", world, true); box(x + 22, 2, z - 25, 20, 4, 14, 0x6a5e52, "checkpoint", world, true); }
+const WALL_P = [0xe6dcc4, 0xddd0b2, 0xd2c3a0, 0xe9e0cb, 0xcdbb98, 0xe3d8bf];
+const ROOF_P = [0xb5532f, 0x9c4528, 0x8a3f2a, 0xc0673a, 0x7e3a26, 0xa84d2c];
+function nearRoadLine(x, z, m) { for (const r of ROAD_LINES.vertical) if (Math.abs(x - r) < (r === 0 ? 15 : m)) return true; for (const r of ROAD_LINES.horizontal) if (Math.abs(z - r) < (r === 0 ? 15 : m)) return true; return false; }
+// 王城を頂く丘陵: 階段状のテラスに住宅が密集し、斜面を上るほど王城へ近づく遠景（-z側、当たり判定は基部の壁のみ）。
+function castleHill() { const terraces = 8, dz = 36, dy = 8, baseZ = -356; box(0, 5, baseZ + 2, 680, 10, 5, 0x9a9082, "wall", world, true); for (let k = 1; k <= terraces; k++) { const y = k * dy, zc = baseZ - k * dz, halfW = 330 - k * 30; box(0, y / 2, zc - dz * .5, halfW * 2 + 24, y + 2, dz + 10, 0x9a9082, "", world, false); box(0, y + 1.4, zc + 1.5, halfW * 2 + 24, 2.8, 1.6, 0x837a6b, "", world, false); for (let x = -halfW; x <= halfW; x += 15) { if (Math.abs(x) < 26) continue; if (Math.random() > .92) continue; const w = rand(7, 11), d = rand(7, 10), h = rand(6, 11); plainSpecs.push({ x: x + rand(-2, 2), z: zc - rand(4, dz - 8), y, w, d, h, rh: w * .36, angle: 0, body: pick(WALL_P), roof: pick(ROOF_P) }); } } const steps = Math.floor(terraces * dz / 5); for (let s = 0; s <= steps; s++) box(0, s * 5 * dy / dz, baseZ - s * 5, 22, 1.4, 6, 0xa89c88, "", world, false); castleOnHill(0, baseZ - terraces * dz + 14, terraces * dy); }
+function castleOnHill(x, z, y) { box(x, y + 12, z, 80, 24, 46, 0xd8cfbb, "", world, true); box(x, y + 27, z - 12, 44, 26, 26, 0xe0d8c4, "", world, true); for (const [sx, sz] of [[-42, -22], [42, -22], [-42, 22], [42, 22]]) { box(x + sx, y + 20, z + sz, 14, 44, 14, 0xcfc6b2, "", world, true); const r = add(new THREE.ConeGeometry(10, 17, 6), mat(0x3f5d78), world, true); r.position.set(x + sx, y + 50, z + sz); cull(r, x + sx, z + sz, 1500); } box(x, y + 42, z - 12, 16, 32, 16, 0xd8cfbb, "", world, true); const sr = add(new THREE.ConeGeometry(13, 27, 6), mat(0x3f5d78), world, true); sr.position.set(x, y + 70, z - 12); cull(sr, x, z, 1500); for (const sx of [-42, 42]) { const fl = box(x + sx, y + 58, z, .3, 6, .1, 0xb33a44, "", world); fl.scale.z = 30; } }
+// 平地の市街を道沿いに連続して埋める（インスタンス化。道路・広場・主要施設は避ける）。
+function cityFill() { const anchors = [[0, 0, 58], [135, -70, 30], [-185, -85, 32], [350, -125, 26], [285, 85, 86], [380, 330, 56], [0, 610, 44], [-250, -350, 50]]; const near = (x, z) => anchors.some((a) => Math.hypot(x - a[0], z - a[1]) < a[2]); const slumRoof = [0x4d3a2a, 0x3b2d20, 0x5a4630, 0x46352a]; const slumWall = [0x8a7a5f, 0x6d5d44, 0x7d6a4e, 0x5d4b39]; const step = 14, prob = Math.min(1, quality.houses * .95); for (let x = -585; x <= 600; x += step) for (let z = -350; z <= 600; z += step) { if (nearRoadLine(x, z, 7)) continue; if (near(x, z)) continue; if (Math.random() > prob) continue; const slum = x < -300 && z > 165; const w = slum ? rand(5, 8) : rand(8, 12.5), d = slum ? rand(5, 8) : rand(8, 11.5), h = slum ? rand(3.5, 6) : rand(6, x > 110 && Math.abs(z) < 130 ? 14 : 11); const ang = roadFacingAngle(x, z) + (slum ? rand(-.22, .22) : rand(-.05, .05)); const jx = rand(-1.6, 1.6), jz = rand(-1.6, 1.6); (slum ? plainSpecs : facadeSpecs).push({ x: x + jx, z: z + jz, w, d, h, rh: w * rand(.3, .42), angle: ang, body: slum ? pick(slumWall) : pick(WALL_P), roof: slum ? pick(slumRoof) : pick(ROOF_P) }); const ab = rotatedAabb(w, d, ang); addCollider(x + jx, z + jz, ab.w * .92, ab.d * .92, "house"); } }
+function centralPlaza() { road(0, 0, 96, 96, 0x8e8370); fountain(0, 0, 4.2); box(0, 4, -30, 5, 8, 5, 0x9a9384, "statue", world, true); const N = 16, R = 62; for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2, px = Math.cos(a) * R, pz = Math.sin(a) * R; if (Math.abs(px) < 16 || Math.abs(pz) < 16) continue; const ang = faceToward(-px, -pz), w = rand(11, 15), d = rand(10, 13), h = rand(11, 17); facadeSpecs.push({ x: px, z: pz, w, d, h, rh: w * .34, angle: ang, body: pick(WALL_P), roof: pick(ROOF_P) }); const ab = rotatedAabb(w, d, ang); addCollider(px, pz, ab.w, ab.d, "house"); } for (let a = 0; a < Math.PI * 2; a += Math.PI / 5) lamp(Math.cos(a) * 43, Math.sin(a) * 43); }
+function guildDistrict(x, z) { house(x, z, 36, 24, 15, 0x6a5036, "GUILD", true, faceToward(0, 1)); box(x, 3, z + 13, 9, 6, .7, 0x201610, "guild", world, true); addQuestBoard(x - 22, z + 4); for (let i = 0; i < 8; i++) addNpc("adventurer", x + rand(-28, 28), z + rand(18, 36), pick([0x8c6f4f, 0x58718d, 0x5f7b55]), "冒険者", "generic"); }
+function churchDistrict(x, z) { house(x, z, 34, 26, 18, 0x7c7a76, "CHURCH", true, faceToward(0, 1)); const sp = add(new THREE.ConeGeometry(7, 24, 4), mat(0x2f3541), world, true); sp.position.set(x, 32, z); sp.rotation.y = Math.PI / 4; cull(sp, x, z, 900); for (let i = 0; i < 8; i++) addNpc("faithful", x + rand(-35, 35), z + rand(18, 45), 0xc9c4ad, "信徒", "church"); }
+function marketDistrict(x, z) { for (let i = 0; i < 60 * quality.props; i++) { const px = x + rand(-82, 82), pz = z + rand(-60, 60); stall(px, pz, pick([0xb43d46, 0x2f6f9f, 0xd8b36b, 0x3f815a, 0xc8763a])); if (i % 4 === 0) addNpc("merchant", px, pz + 4, 0x9a6f54, "商人", "market"); if (i % 6 === 0) crates(px + rand(-3, 3), pz + rand(-3, 3), Math.floor(rand(2, 4))); } }
+function craftDistrict(x, z) { house(x, z, 24, 18, 9, 0x9c7a4c, "SMITH", true, faceToward(0, 1)); box(x + 18, 1.1, z + 5, 8, 2.2, 5, 0x3a2a21, "forge", world, true); box(x + 10, .8, z - 5, 4, 1.6, 2.2, 0x3d3d40, "anvil"); addNpc("blacksmith", x + 22, z + 8, 0x6f4b32, "鍛冶職人", "blacksmith"); }
+function nobleDistrict(x, z) { for (let i = 0; i < 4; i++) addNpc("guard", x + rand(-45, 45), z + rand(22, 62), 0xb77954, "衛兵", "generic"); }
+function slumDistrict(x, z) { for (let i = 0; i < 8; i++) addNpc("slum", x + rand(-95, 95), z + rand(-75, 75), 0x4f4238, "路地の住人", "alley"); alleyDetails(x + 20, z - 10); }
+function trainingDistrict(x, z) { box(x, .06, z, 90, .12, 55, 0x746b56, "yard", world, true); for (let i = 0; i < 18; i++) cyl(x + rand(-38, 38), 1, z + rand(-22, 22), .28, 2, 0x8a5d38, "target"); addNpc("guard", x - 36, z + 20, 0xb77954, "訓練教官", "training_gate"); }
+function streetFronts() { for (const z of [-430, -330, -130, 130, 330, 430]) for (let x = -560; x <= 560; x += 30) { if (Math.abs(x) < 60 && Math.abs(z) < 60) continue; const side = Math.random() < .5 ? -1 : 1; placeStreetHouse(x + rand(-3, 3), z + side * rand(22, 31), Math.random() < .18 ? pick(["INN", "HERB", "FOOD", "TOOLS", null]) : null); } for (const x of [-430, -330, -130, 130, 330, 430]) for (let z = -560; z <= 560; z += 30) { if (Math.abs(x) < 60 && Math.abs(z) < 60) continue; const side = Math.random() < .5 ? -1 : 1; placeStreetHouse(x + side * rand(22, 31), z + rand(-3, 3), Math.random() < .18 ? pick(["BAKER", "INN", "HERB", null]) : null); } }
+function denseBlocks() { const zones = [[-360, 80, -80, 570, "slum"], [-520, -120, -520, -150, "noble"], [-60, 520, -500, -180, "res"], [-560, 560, 150, 560, "res"], [-560, -260, -120, 120, "res"], [160, 560, -60, 280, "market"], [160, 560, -300, -130, "craft"]]; for (const [x1, x2, z1, z2, type] of zones) for (let x = x1; x <= x2; x += 42) for (let z = z1; z <= z2; z += 38) { if (Math.abs(x) < 55 && Math.abs(z) < 55) continue; if (Math.random() > quality.houses * .58) continue; type === "slum" ? slumHouse(x + rand(-5, 5), z + rand(-4, 4), roadFacingAngle(x, z)) : placeStreetHouse(x + rand(-4, 4), z + rand(-4, 4), Math.random() < .12 ? pick(["INN", "FOOD", "HERB", "BAKER", null]) : null); } }
+function placeStreetHouse(x, z, sign = null, important = false) { house(x, z, rand(8, 15), rand(8, 13), rand(5, 10), pick([0x7b5a3d, 0x83684d, 0x6d5d4a, 0x8d6542]), sign, important, roadFacingAngle(x, z)); }
+function props() { for (let i = 0; i < 110 * quality.props; i++) Math.random() < .6 ? crates(rand(-590, 590), rand(-590, 590), Math.floor(rand(2, 5))) : addRock(rand(-590, 590), rand(-590, 590), rand(.25, .6)); }
+function traffic() { const routes = [[[-610, 15], [-220, 15], [80, 15], [610, 15]], [[15, 620], [15, 260], [15, -40], [15, -610]], [[-15, -610], [-15, -300], [-15, 40], [-15, 620]], [[240, 260], [350, 90], [420, -120], [260, -260]]]; for (let i = 0; i < quality.carts; i++) { const obj = cart(); const path = routes[i % routes.length]; obj.position.set(path[0][0], 0, path[0][1] + i * 4); world.add(obj); movers.push({ type: "cart", obj, path, index: 1, speed: rand(2.4, 4.2), wait: 0, r: 2.4 }); } }
+function pedestrians() { const routes = [[[-580, 8], [-280, 8], [0, 8], [280, 8], [580, 8]], [[8, 600], [8, 260], [8, -80], [8, -580]], [[-390, 260], [-420, 230], [-360, 180], [-300, 210]], [[230, 100], [300, 110], [350, 80], [280, 40]], [[130, -55], [0, 0], [-185, -75]]]; for (let i = 0; i < 45 * quality.npcs; i++) { const path = JSON.parse(JSON.stringify(pick(routes))); const obj = createPerson(pick(["traveler", "merchant", "adventurer", "faithful", "slum"]), pick([0x7f9fbd, 0x8c6f4f, 0x6f8aa6, 0x8c7b5b, 0x9a6f54])); obj.position.set(path[0][0] + rand(-4, 4), 0, path[0][1] + rand(-4, 4)); scene.add(obj); npcs.push(obj); movers.push({ type: "ped", obj, path, index: 1, speed: rand(1.1, 2.2), wait: rand(0, 1), r: .7 }); } }
 
-function buildKingdom(){
-  env(0x9eb9c6, 45, 430);
-  bounds = { minX:-210, maxX:210, minZ:-210, maxZ:210 };
-  ground(430,430,0x4b634d);
-  cityWall();
-
-  addRoad(0,0,18,390,0x817767);
-  addRoad(0,0,390,18,0x817767);
-  addRoad(-78,0,10,330,0x736857);
-  addRoad(78,0,10,330,0x736857);
-  addRoad(0,-76,330,10,0x736857);
-  addRoad(0,78,330,10,0x736857);
-
-  addCastle(0,-150);
-  addFountain(0,0);
-  addGuildExterior(28,-44);
-  addChurchExterior(-74,-44);
-  addTrainingYard(128,78);
-  addMarketBlock(82,20);
-  addShopRow();
-  addNobleBlock(-105,-80);
-  addBarracks(120,-80);
-  addSlumBlock(-120,80);
-  addSuspiciousAlley(-148,72);
-
-  const reservedZones = [[0,0,44],[28,-44,32],[-74,-44,34],[82,20,58],[128,78,54],[-105,-80,66],[-120,80,68],[-148,72,46],[0,-150,58],[0,185,32],[120,-80,42]];
-  for(let gx=-168; gx<=168; gx+=28){
-    for(let gz=-168; gz<=168; gz+=28){
-      if(Math.abs(gx)<24 || Math.abs(gz)<24 || Math.hypot(gx,gz)<36) continue;
-      if(gx < -100 && gz > 45) continue;
-      if(reservedZones.some(([rx,rz,rr])=>Math.hypot(gx-rx,gz-rz)<rr)) continue;
-      if(Math.random()<.78) addMedievalHouse(gx+rand(-4,4),gz+rand(-4,4),rand(5.2,9.5),rand(4.8,9),rand(3.2,6.8), pick([0x7b5a3d,0x83684d,0x6d5d4a,0x8d6542]));
-    }
-  }
-
-  for(let i=0;i<180;i++){
-    const x = rand(-190,190), z = rand(-190,190);
-    if(Math.abs(x)<18 || Math.abs(z)<18) continue;
-    if(Math.random()<.42) addTree(x,z,rand(.65,1.05), false);
-    else addCrateStack(x,z,Math.floor(rand(2,5)));
-  }
-
-  addTrafficCarts();
-  addPedestrians();
-  addRoleNpcs();
-  addStreetDetails();
-  [[0,185,"NORTH GATE"],[28,-31,"GUILD"],[-74,-31,"CHURCH"],[128,94,"TRAINING"],[0,-135,"CASTLE"],[-148,72,"ALLEY"]].forEach(v=>addSignPost(...v));
-}
-
-function buildGuildHall(){
-  env(0x1f1711,12,34);
-  bounds = { minX:-7.5, maxX:7.5, minZ:-6.8, maxZ:7.2 };
-  room(16,15,3.2,0x4c3727,0x3a281c,0x5b402b);
-  placeBox(0,.55,-4.5,6.4,1.1,.9,0x6b4a2f,"counter");
-  placeBox(0,1.2,-6.2,5.6,2.4,.5,0x5a3d27,"shelf");
-  for(let i=-2;i<=2;i++) placeCylinder(i*.85,1.95,-5.95,.08,.48,0x6c8aa6);
-  addSignPost(0,-5.4,"RECEPTION");
-  addQuestBoard(-5.6,-4.4);
-  addTable(-3.4,1.4);
-  addTable(3.6,1.2);
-  addCrateStack(5.6,4.4,5);
-  addInteriorShelves();
-  addLamp(-6.8,-2); addLamp(6.8,-2);
-  placeBox(0,.05,1.7,4.2,.03,8.6,0x652b2d);
-}
-function buildChurch(){
-  env(0x151823,12,34);
-  bounds = { minX:-6.7, maxX:6.7, minZ:-6.2, maxZ:6.8 };
-  room(14,14,4,0x5b5a55,0x44434a,0x6a604b);
-  placeBox(0,.55,-4.4,3.8,1.05,1.25,0xddd1ae,"altar");
-  placeBox(0,1.1,-4.4,3.1,.08,.95,0xf2e5c0);
-  [[-1,-4.15],[1,-4.15],[-.55,-3.85],[.55,-3.85]].forEach(v=>addCandle(...v));
-  for(let i=0;i<4;i++){ addBench(-2.6,-1.2+i*1.45); addBench(2.6,-1.2+i*1.45); }
-  addSignPost(0,-5.4,"ALTAR");
-}
-function buildTrainingGround(){
-  env(0x88a6b4,25,180);
-  bounds = { minX:-60, maxX:60, minZ:-70, maxZ:70 };
-  ground(130,150,0x556c4c);
-  addRoad(0,0,18,130,0x776b5a);
-  for(let i=0;i<12;i++){
-    const t = placeCylinder(rand(-35,35),.85,rand(-40,40),.25,1.7,0x7a5635,"target");
-    const label = createLabel("TARGET"); label.scale.set(.9,.24,1); label.position.set(0,2.1,0); t.add(label);
-  }
-  addSignPost(0,48,"TO CAPITAL");
-}
-
-function room(w,d,h,floor,wall,beam){
-  placeBox(0,-.02,0,w,.12,d,floor);
-  [[0,-d/2,w,.35],[-w/2,0,.35,d],[w/2,0,.35,d],[-w*.3,d/2,w*.4,.35],[w*.3,d/2,w*.4,.35]].forEach(([x,z,ww,dd])=>placeBox(x,h/2,z,ww,h,dd,wall,"wall"));
-  for(let i=0;i<6;i++) placeBox(0,h-.3,-d/2+1+i*((d-2)/5),w-.8,.24,.26,beam);
-}
-function cityWall(){
-  for(const [x,z,w,d] of [[0,-205,400,6],[0,205,400,6],[-205,0,6,400],[205,0,6,400]]) placeBox(x,3,z,w,6,d,0x6d6c64,"wall");
-  for(let i=-180;i<=180;i+=40){
-    placeBox(i,8,-205,8,10,8,0x74736b,"tower"); placeBox(i,8,205,8,10,8,0x74736b,"tower");
-    placeBox(-205,8,i,8,10,8,0x74736b,"tower"); placeBox(205,8,i,8,10,8,0x74736b,"tower");
-  }
-}
-function addGateModel(x,z){
-  placeBox(x,3,z,28,6,5,0x6d6c64,"gate");
-  placeBox(x-10,8,z,5,10,7,0x74736b,"gateTower");
-  placeBox(x+10,8,z,5,10,7,0x74736b,"gateTower");
-  const arch = add(new THREE.TorusGeometry(5.2,.35,8,24,Math.PI), mat(0x8a887e));
-  arch.position.set(x,5.5,z+2.55);
-  arch.rotation.z = Math.PI;
-}
-function addCastle(x,z){
-  placeBox(x,4,z,42,8,34,0x8b8a82,"castle");
-  placeBox(x,10,z-12,28,8,12,0x96958e,"castleKeep");
-  for(const sx of [-19,19]){
-    placeBox(x+sx,11,z,8,16,8,0x7e7d76,"castleTower");
-    const roof=add(new THREE.ConeGeometry(6,8,4),mat(0x394456)); roof.position.set(x+sx,23,z); roof.rotation.y=Math.PI/4; roof.castShadow=activeQuality.shadows;
-  }
-}
-function addMedievalHouse(x,z,w,d,h,color, signText=null){
-  const g = new THREE.Group(); g.position.set(x,0,z); g.rotation.y = rand(-.035,.035); world.add(g);
-  g.userData.shadowPriority = signText === "GUILD" || signText === "CHURCH";
-  const upper = Math.max(0, h-2.3);
-  placeBox(0,1.05,0,w*.94,2.1,d*.94,0x76614a,"",g);
-  placeBox(0,2.15+upper/2,0,w,upper,d,color,"",g);
-  placeBox(0,2.24,d/2+.05,w+.45,.18,.18,0x352317,"",g);
-  placeBox(0,2.24,-d/2-.05,w+.45,.18,.18,0x352317,"",g);
-  for(const sx of [-w*.46,w*.46]) placeBox(sx,2.2,0,.18,Math.max(2.1,h-.3),d+.18,0x352317,"",g);
-  for(const sx of [-w*.24,w*.24]) placeBox(sx,2.45,d/2+.08,.16,h*.78,.16,0x3d291a,"",g);
-  for(const sx of [-w*.36,w*.36]){ const brace=placeBox(sx,2.55,d/2+.14,.16,h*.64,.14,0x3d291a,"",g); brace.rotation.z=sx<0?.42:-.42; }
-  const roofColor = pick([0x3b2a1e,0x2c4256,0x742831,0x4d2f28]);
-  const roof = add(new THREE.ConeGeometry(Math.max(w,d)*.78,2.8,4), mat(roofColor), g);
-  roof.position.set(0,h+1.35,0); roof.rotation.y=Math.PI/4;
-  placeBox(0,h+.25,d/2+.35,w+.9,.26,.3,roofColor,"",g);
-  placeBox(0,h+.25,-d/2-.35,w+.9,.26,.3,roofColor,"",g);
-  for(const sx of [-w*.28,w*.28]) for(const yy of [1.55,2.85]){
-    placeBox(sx,yy,d/2+.08,.82,.9,.09,0x5b3a24,"",g);
-    placeBox(sx,yy,d/2+.145,.54,.58,.045,0x83a4b6,"",g);
-    placeBox(sx,yy,d/2+.18,.08,.72,.04,0x2b1b12,"",g);
-  }
-  placeBox(0,1.03,d/2+.12,1.2,1.9,.14,0x201610,"",g);
-  placeBox(0,2.05,d/2+.17,1.45,.16,.16,0x8c6740,"",g);
-  const sign = signText ?? (Math.random()<.6 ? pick(["INN","BAKER","SMITH","TOOLS","HERBS","TAVERN"]) : null);
-  if(sign){
-    const board = createLabel(sign);
-    board.scale.set(1.05,.28,1); board.position.set(rand(-w*.28,w*.28),2.58,d/2+.42); g.add(board);
-    placeBox(board.position.x,2.34,d/2+.24,.08,.48,.08,0x2a1b10,"",g);
-  }
-  if(Math.random()<.58) placeBox(-w*.34,h+1.35,-d*.2,.46,1.75,.46,0x50453b,"",g);
-  addCollider(x,z,w,d,"house");
-  registerCullable(g,"building",x,z,signText ? 1.8 : 1);
-  return g;
-}
-function addGuildExterior(x,z){
-  addMedievalHouse(x,z,16,12,7.5,0x6a5036,"GUILD");
-  placeBox(x,2,z+6.3,3.2,4,.4,0x201610,"guildDoor");
-  placeBox(x-5.7,2.5,z+6.4,.38,4.6,.38,0x3a2415,"",world);
-  placeBox(x+5.7,2.5,z+6.4,.38,4.6,.38,0x3a2415,"",world);
-  placeBox(x,4.55,z+6.55,12.8,.34,.34,0x3a2415,"",world);
-  const emblem=add(new THREE.OctahedronGeometry(.75,0),mat(0xd8b36b,.6,0xd8b36b,.18)); emblem.position.set(x,4.25,z+6.85);
-  addQuestBoard(x-8.8,z+5.8);
-  addSignPost(x,z+9,"GUILD");
-}
-function addChurchExterior(x,z){
-  addMedievalHouse(x,z,15,12,9,0x7c7a76,"CHURCH");
-  placeBox(x,4.8,z-1,8,8,13,0x777873,"churchStone");
-  const sp=add(new THREE.ConeGeometry(3,11,4),mat(0x2f3541)); sp.position.set(x,16,z); sp.rotation.y=Math.PI/4; sp.castShadow=activeQuality.shadows;
-  for(const sx of [-6.8,6.8]){ placeBox(x+sx,3.2,z,1.1,6.2,2.1,0x5f625f,"buttress"); }
-  for(const sx of [-2.6,0,2.6]){ placeBox(x+sx,4.2,z+6.25,1.1,2.3,.12,0x547d9a,"",world); }
-  placeBox(x,10.8,z+6.35,.32,2.7,.18,0xd8d1bc,"",world);
-  placeBox(x,11.7,z+6.36,1.6,.28,.18,0xd8d1bc,"",world);
-  addSignPost(x,z+9,"CHURCH");
-}
-function addMarketBlock(x,z){
-  for(let i=0;i<30;i++){
-    const px=x+rand(-34,34), pz=z+rand(-34,34);
-    const g=new THREE.Group(); g.position.set(px,0,pz); g.rotation.y=rand(-.18,.18); world.add(g);
-    placeBox(0,.35,0,2.9,.7,1.55,0x6a4d35,"",g);
-    placeBox(-1.22,.95,-.68,.1,1.4,.1,0x3c2818,"",g);
-    placeBox(1.22,.95,-.68,.1,1.4,.1,0x3c2818,"",g);
-    placeBox(-1.22,.95,.68,.1,1.4,.1,0x3c2818,"",g);
-    placeBox(1.22,.95,.68,.1,1.4,.1,0x3c2818,"",g);
-    const roof=placeBox(0,1.45,0,3.45,.16,2.25,pick([0xb43d46,0x2f6f9f,0xd8b36b,0x3f815a]),"",g);
-    roof.rotation.z=rand(-.08,.08);
-    for(let j=0;j<6;j++){
-      const item=add(new THREE.DodecahedronGeometry(.13,0),mat(pick([0xbf5545,0xd8b36b,0x5f9056,0x8f6b3f,0xc9c4ad])),g);
-      item.position.set(rand(-1.0,1.0),.83,rand(-.5,.5));
-    }
-    if(i%5===0){ const label=createLabel(pick(["BREAD","MEAT","SPICE","CLOTH","POTION"])); label.scale.set(.9,.23,1); label.position.set(0,1.9,.95); g.add(label); }
-    addCollider(px,pz,3.15,1.9,"stall");
-    registerCullable(g,"prop",px,pz,1.2);
-  }
-}
-function addShopRow(){
-  addNamedShop(112,-28,"INN","inn",0x806348);
-  addNamedShop(136,-28,"SMITH","smith",0x6b6256);
-  addNamedShop(112,-58,"HERBS","herbalist",0x5f7550);
-  addNamedShop(136,-58,"TAVERN","tavern",0x7b4f3a);
-  addNamedShop(94,-74,"EATERY","eatery",0x83684d);
-}
-function addNamedShop(x,z,label,type,color){
-  addMedievalHouse(x,z,10,8,5.8,color,label);
-  if(type==="smith"){
-    placeBox(x-5.8,.55,z+3.8,2.3,.8,1.8,0x3b3028,"anvilTable");
-    placeBox(x-5.8,1.15,z+3.8,.72,.42,.34,0x25282b,"anvil");
-    const fire=add(new THREE.SphereGeometry(.32,12,8),mat(0xff6b24,.35,0xff4b16,1.2)); fire.position.set(x-7.1,.95,z+3.6);
-  }
-  if(type==="herbalist"){ for(let i=0;i<6;i++) placeCylinder(x-5+i*.55,.55,z+4.2,.12,.42,pick([0x5f9056,0x3f815a,0x8fa86a]),"pot"); }
-  if(type==="inn"||type==="tavern"||type==="eatery"){
-    addTable(x-5.6,z+4.0); addBarrel(x-7.6,z+2.7);
-  }
-}
-function addRoleNpcs(){
-  const roles=[
-    ["market_vendor","merchant","薬草商",88,20,"market_vendor"],["market_vendor2","merchant","香辛料商",108,12,"market_vendor"],
-    ["guild_adv","adventurer","剣盾の冒険者",35,-23,"adventurer_chatter"],["guild_adv2","veteran","斥候風の冒険者",18,-25,"adventurer_chatter"],
-    ["church_faithful","pilgrim","祈る信徒",-68,-24,"church_faithful"],["church_acolyte","priest","教会見習い",-82,-27,"church_faithful"],
-    ["gate_guard","guard","北門衛兵",-8,176,"guard_checkpoint"],["alley_broker","shady","情報屋",-148,92,"alley_broker"],
-    ["smith_owner","blacksmith","鍛冶職人",136,-19,"blacksmith"],["innkeeper","commoner","宿屋の女将",112,-19,"innkeeper"]
-  ];
-  roles.forEach(([id,variant,name,x,z,dialogue])=>addNpc({ id, variant, name, position:{x,z}, color:roleColor(variant), dialogue, radius:.78 }));
-}
-function roleColor(v){
-  return ({ merchant:0x9a6f54, adventurer:0x4d6388, pilgrim:0xc9c4ad, priest:0xd5cfbc, guard:0xb77954, shady:0x272331, blacksmith:0x6c5a4a, commoner:0x7f9fbd, veteran:0x8c6f4f })[v] || 0x7f9fbd;
-}
-function addSlumBlock(x,z){
-  for(let i=0;i<38;i++) addMedievalHouse(x+rand(-48,48),z+rand(-38,38),rand(3,6),rand(3,6),rand(2.2,4),pick([0x5d4b39,0x4f4238,0x6d5237]));
-}
-function addNobleBlock(x,z){
-  for(let i=0;i<18;i++) addMedievalHouse(x+rand(-48,48),z+rand(-40,40),rand(7,12),rand(6,11),rand(5,8.5),pick([0x8b806d,0x90785e,0x7a776f]));
-}
-function addBarracks(x,z){
-  for(let i=0;i<8;i++) placeBox(x+((i%4)-1.5)*14,3,z+Math.floor(i/4)*16,10,6,12,0x60646a,"barracks");
-  addSignPost(x,z-14,"BARRACKS");
-}
-function addTrainingYard(x,z){
-  placeBox(x,.06,z,42,.1,28,0x746b56,"yard");
-  for(let i=0;i<10;i++) placeCylinder(x+rand(-18,18),.9,z+rand(-10,10),.18,1.8,0x8a5d38,"target");
-  addSignPost(x,z+18,"TRAINING");
-}
-function addSuspiciousAlley(x,z){
-  addRoad(x,z,8.5,74,0x312d29);
-  for(let i=0;i<9;i++){
-    const zz=z-33+i*8;
-    placeBox(x-5.2,2.7,zz,4.4,5.4,7.2,pick([0x3b332d,0x4b3b32,0x3f3f3a]),"alleyHouse");
-    placeBox(x+5.2,2.7,zz,4.4,5.4,7.2,pick([0x3b332d,0x4b3b32,0x3f3f3a]),"alleyHouse");
-    if(i%2===0) addHangingCloth(x,zz+2.2,pick([0x5d2d35,0x6d5d4a,0x2f4550]));
-    if(i%3===0) addDimLantern(x+(i%2?3.1:-3.1),zz);
-  }
-  for(let i=0;i<18;i++) addCrateStack(x+rand(-2.8,2.8),z+rand(-32,32),Math.floor(rand(2,5)));
-  for(let i=0;i<9;i++) addBarrel(x+rand(-3.2,3.2),z+rand(-30,30));
-  addHiddenDoor(x-4.85,z+22);
-  const hood = createPerson({ variant:"shady", color:0x272331 });
-  hood.position.set(x,0,z+18);
-  hood.userData={ id:"shady_man", kind:"npc", name:"路地裏の男", dialogue:"shady_alley", radius:.8 };
-  const label=createLabel("???"); label.scale.set(.9,.24,1); label.position.set(0,2.55,0); hood.add(label);
-  scene.add(hood); npcs.push(hood);
-}
-function addStreetDetails(){
-  for(let i=0;i<70;i++){
-    const z=rand(-180,180), side=Math.random()<.5?-1:1;
-    addLamp(side*10,z);
-    if(i%3===0) addCrateStack(side*rand(20,190),rand(-190,190),Math.floor(rand(2,4)));
-  }
-  for(let i=0;i<18;i++){
-    const wellX=rand(-160,160), wellZ=rand(-160,160);
-    if(Math.abs(wellX)<24||Math.abs(wellZ)<24) addFountain(wellX,wellZ);
-  }
-}
-function addTree(x,z,s=1,solid=false){
-  queueInstance("cylinder",0x5b3a24,x,.75*s,z,.18*s,1.5*s,.18*s,"prop");
-  queueInstance("rock",0x2f6f45,x,1.8*s,z,s,s,s,"prop");
-  queueInstance("rock",0x3d8a59,x+.35*s,2.35*s,z-.12*s,.65*s,.65*s,.65*s,"prop");
-  if(solid) addCollider(x,z,.9*s,.9*s,"tree");
-}
-function addCrateStack(x,z,n){
-  for(let i=0;i<n;i++) queueInstance("box",0x735334,x+(i%2)*.75,.35+Math.floor(i/2)*.38,z+Math.floor(i/2)*.75,.7,.7,.7,"prop");
-  addCollider(x+.38,z+.38,1.55,1.55,"crateStack");
-}
-function addBarrel(x,z,parent=world){
-  if(parent===world){
-    queueInstance("cylinder",0x6a4328,x,.38,z,.38,.74,.38,"prop");
-    queueInstance("box",0x352317,x,.72,z,.82,.08,.82,"prop");
-    addCollider(x,z,.8,.8,"barrel");
-    return null;
-  }
-  const b=add(new THREE.CylinderGeometry(.36,.4,.74,10),mat(0x6a4328),parent);
-  b.position.set(parent===world?x:0,.38,parent===world?z:0);
-  placeBox(parent===world?x:0,.72,parent===world?z:0,.82,.08,.82,0x352317,"",parent);
-  return b;
-}
-function addSack(x,y,z,parent=world){
-  const s=add(new THREE.SphereGeometry(.32,10,8),mat(0x9a7b4d),parent);
-  s.position.set(x,y,z); s.scale.set(1.15,.72,.9);
-  return s;
-}
-function addHangingCloth(x,z,color){
-  placeBox(x,2.75,z,7.2,.08,.08,0x2b1b12,"",world);
-  const cloth=placeBox(x,2.15,z,2.4,1.1,.08,color,"",world); cloth.rotation.z=rand(-.08,.08);
-}
-function addHiddenDoor(x,z){
-  placeBox(x,1.05,z,.18,2.1,1.35,0x241711,"hiddenDoor");
-  const mark=add(new THREE.TorusGeometry(.28,.025,6,16),mat(0x624325,.6,0x624325,.18)); mark.position.set(x+.12,1.32,z); mark.rotation.y=Math.PI/2;
-}
-function addDimLantern(x,z){
-  placeCylinder(x,1.35,z,.06,2.2,0x29221d);
-  const l=add(new THREE.SphereGeometry(.15,8,6),mat(0xb46d2a,.45,0xb46d2a,.65)); l.position.set(x,2.35,z);
-}
-function addLamp(x,z){
-  placeCylinder(x,1.4,z,.08,2.8,0x3d342f);
-  const l=add(new THREE.SphereGeometry(.18,10,8),mat(0xe7c56f,.4,0xe7c56f,.8)); l.position.set(x+.35,2.5,z);
-}
-function addSignPost(x,z,text){
-  placeCylinder(x,.75,z,.08,1.5,0x332315);
-  const s=createLabel(text); s.scale.set(1.55,.42,1); s.position.set(x,1.75,z); world.add(s);
-}
-function addQuestBoard(x,z){
-  placeBox(x,1.25,z,.18,2.2,2.2,0x4a301c,"questBoard");
-  const l=createLabel("QUEST"); l.scale.set(1.3,.34,1); l.position.set(x+.15,2.55,z); world.add(l);
-}
-function addTable(x,z){
-  placeBox(x,.55,z,2,.35,1.2,0x5a3e28,"table");
-  [-.75,.75].forEach(s=>placeBox(x+s,.32,z+.95,.45,.55,.45,0x3e2a1d,"chair"));
-}
-function addCandle(x,z){
-  placeCylinder(x,1.34,z,.06,.42,0xe8e0c9);
-  const f=add(new THREE.SphereGeometry(.05,8,8),mat(0xf2cb6b,.3,0xf2cb6b,1)); f.position.set(x,1.62,z);
-}
-function addBench(x,z){ placeBox(x,.28,z,2.4,.35,.55,0x5d4129,"bench"); }
-function addFountain(x,z){
-  placeCylinder(x,.4,z,1.8,.8,0x6f7a80,"fountain");
-  const water=add(new THREE.CylinderGeometry(1.35,1.35,.08,24),mat(0x69a7d2,.25,0x69a7d2,.12)); water.position.set(x,.85,z);
-}
-function addMarker(l){
-  const c=l.targetMap?0xd8b36b:0x87c7ff;
-  const ring=add(new THREE.TorusGeometry(.75,.03,8,32),mat(c,.42,c,.7),world,false,false);
-  ring.position.set(l.position.x,.08,l.position.z); ring.rotation.x=Math.PI/2;
-  const cone=add(new THREE.ConeGeometry(.18,.9,4),mat(c,.45,c,.55),world,false,false);
-  cone.position.set(l.position.x,.85,l.position.z); cone.rotation.y=Math.PI/4;
-}
-function addInteriorShelves(){
-  for(const x of [-6.3,6.3]){
-    for(let i=0;i<5;i++){
-      placeBox(x,1.0,-3.2+i*1.15,.32,1.7,.8,0x4b3422,"shelf");
-      for(let j=0;j<3;j++) placeBox(x*.98,.45+j*.45,-3.2+i*1.15,.18,.18,.5,pick([0x6c8aa6,0x8a6f4b,0x735334]));
-    }
-  }
-}
-
-function addPedestrians(){
-  const paths = [
-    [[-170,4],[-40,4],[40,4],[170,4]],
-    [[4,180],[4,40],[4,-40],[4,-170]],
-    [[-70,76],[-110,76],[-150,76],[-150,42]],
-    [[76,-115],[120,-80],[160,-70]],
-    [[20,-30],[55,-20],[95,15],[125,60]]
-  ];
-  for(let i=0;i<26;i++){
-    const p = createPerson({ variant: pick(["traveler","guild_guide","veteran"]), color: pick([0x7f9fbd,0x8c6f4f,0x6f8aa6,0x8c7b5b,0x9a6f54]) });
-    const path = structuredClone(pick(paths));
-    const start = path[0];
-    p.position.set(start[0]+rand(-2,2),0,start[1]+rand(-2,2));
-    p.userData.isMover = true;
-    scene.add(p);
-    movers.push({ type:"ped", object:p, path, index:1, speed:rand(1.2,2.3), wait:rand(0,1), radius:.68 });
-  }
-}
-function addWanderingGuards(){
-  for(let i=0;i<4;i++){
-    const g=createPerson({variant:"guard",color:0xb77954});
-    g.position.set(rand(-6,6),0,rand(-70,55));
-    g.userData.isMover = true;
-    scene.add(g);
-    movers.push({ type:"ped", object:g, path:[[rand(-5,5),rand(60,80)],[rand(-5,5),rand(15,20)],[rand(-5,5),rand(-90,-70)]], index:1, speed:1.7, wait:0, radius:.72 });
-  }
-}
-function addTrafficCarts(){
-  const routes = [
-    [[-180,9],[-60,9],[40,9],[175,9]],
-    [[9,178],[9,88],[9,-10],[9,-178]],
-    [[-9,-178],[-9,-80],[-9,40],[-9,178]]
-  ];
-  for(let i=0;i<5;i++){
-    const cart=createMovingCart();
-    const path=structuredClone(routes[i%routes.length]);
-    const start=path[0];
-    cart.position.set(start[0],0,start[1]+i*2);
-    world.add(cart);
-    movers.push({ type:"cart", object:cart, path, index:1, speed:rand(2.0,3.4), wait:0, radius:2.25 });
-  }
-}
-function createMovingCart(){
-  const g=new THREE.Group();
-  g.userData.shadowPriority = true;
-  placeBox(0,.52,0,2.9,.65,1.65,0x70482c,"",g);
-  placeBox(0,.98,0,2.65,.18,1.45,0x8a5d38,"",g);
-  placeBox(-1.48,.85,0,.16,.75,1.7,0x3b2a1d,"",g);
-  placeBox(1.48,.85,0,.16,.75,1.7,0x3b2a1d,"",g);
-  const axle=add(new THREE.CylinderGeometry(.07,.07,3.3,10),mat(0x2c2018),g); axle.position.set(0,.34,0); axle.rotation.z=Math.PI/2;
-  const horse=createHorse(); horse.position.set(0,0,-1.72); g.add(horse);
-  for(const sx of [-1.35,1.35]) for(const sz of [-.72,.72]){
-    const w=add(new THREE.TorusGeometry(.38,.075,8,20),mat(0x2c2018),g); w.position.set(sx,.35,sz); w.rotation.y=Math.PI/2;
-    placeCylinder(sx,.35,sz,.04,.82,0x8a6f4b,"",g).rotation.x=Math.PI/2;
-  }
-  for(let i=0;i<4;i++) addSack(rand(-.8,.8),1.17,rand(-.45,.45),g);
-  const reinL=placeBox(-.25,1.05,-1.12,.04,.04,1.4,0x2a1a12,"",g); reinL.rotation.x=.1;
-  const reinR=placeBox(.25,1.05,-1.12,.04,.04,1.4,0x2a1a12,"",g); reinR.rotation.x=.1;
-  return g;
-}
-function updateMovers(dt){
-  for(const m of movers){
-    const updateRange=m.type==="cart" ? activeQuality.animate.cart : activeQuality.animate.ped;
-    if(!state.debug && Math.hypot(player.position.x-m.object.position.x,player.position.z-m.object.position.z)>updateRange) continue;
-    if(m.wait>0){ m.wait-=dt; continue; }
-    const target=m.path[m.index];
-    if(!target) continue;
-    const obj=m.object, dx=target[0]-obj.position.x, dz=target[1]-obj.position.z, dist=Math.hypot(dx,dz);
-    if(dist<1.2){ m.index=(m.index+1)%m.path.length; if(m.type==="ped") m.wait=rand(.2,1.4); continue; }
-    const vx=dx/dist, vz=dz/dist;
-    obj.position.x += vx*m.speed*dt;
-    obj.position.z += vz*m.speed*dt;
-    obj.rotation.y = Math.atan2(vx,vz);
-    if(m.type==="ped") obj.position.y = Math.abs(Math.sin(clock.elapsedTime*5))*0.025;
-  }
-  resolveDynamicContacts();
-}
-function resolveDynamicContacts(){
-  if(state.debug || state.inDialogue) return;
-  const px=player.position.x, pz=player.position.z;
-  for(const m of movers){
-    const rr=(m.radius || (m.type==="cart"?2.15:.68)) + .62;
-    const dx=px-m.object.position.x, dz=pz-m.object.position.z, dist=Math.hypot(dx,dz);
-    if(dist>0.001 && dist<rr){
-      const push=(rr-dist)*.65;
-      player.position.x=THREE.MathUtils.clamp(player.position.x+(dx/dist)*push,bounds.minX,bounds.maxX);
-      player.position.z=THREE.MathUtils.clamp(player.position.z+(dz/dist)*push,bounds.minZ,bounds.maxZ);
-    }
-  }
-  for(const n of npcs){
-    if(n.visible===false) continue;
-    const rr=(n.userData?.radius || .72)+.58;
-    const dx=player.position.x-n.position.x, dz=player.position.z-n.position.z, dist=Math.hypot(dx,dz);
-    if(dist>0.001 && dist<rr){
-      const push=(rr-dist)*.5;
-      player.position.x=THREE.MathUtils.clamp(player.position.x+(dx/dist)*push,bounds.minX,bounds.maxX);
-      player.position.z=THREE.MathUtils.clamp(player.position.z+(dz/dist)*push,bounds.minZ,bounds.maxZ);
-    }
-  }
-}
-
-function addCaravanScene(x,z){
-  const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=-.22; world.add(g); caravan=g;
-  g.userData.shadowPriority = true;
-  const cart=placeBox(0,.55,0,2.7,.65,1.55,0x6a4328,"",g); cart.rotation.z=questDone("merchant")?.05:-.18;
-  placeBox(0,.95,0,2.55,.16,1.35,0x8a5d38,"",g);
-  const axle=add(new THREE.CylinderGeometry(.08,.08,3.15,10),mat(0x3b2a1d),g); axle.rotation.z=Math.PI/2; axle.position.set(0,.32,0);
-  for(const sx of [-1.28,1.28]) for(const sz of [-.68,.68]){ const w=add(new THREE.TorusGeometry(.38,.08,8,20),mat(0x2c2018),g); w.position.set(sx,.35,sz); w.rotation.y=Math.PI/2; }
-  for(let i=0;i<9;i++){ const b=placeBox(rand(-.95,.95),.92+Math.floor(i/3)*.33,rand(-.55,.55),.5,.38,.48,pick([0x8c6239,0x6d5237,0x9a7b4d]),"",g); b.rotation.y=rand(-.45,.45); }
-  for(let i=0;i<4;i++) addSack(rand(-.8,.8),1.38,rand(-.52,.52),g);
-  for(let i=0;i<5;i++){ const plank=placeBox(rand(-1.5,1.8),.12,rand(-1.05,1.05),1.2,.09,.18,0x4a2f1e,"",g); plank.rotation.y=rand(-.8,.8); plank.rotation.z=rand(-.2,.2); }
-  const scorch=add(new THREE.CircleGeometry(.75,16),mat(0x17100c,.95,0x3a1306,.18),g,false,true); scorch.rotation.x=-Math.PI/2; scorch.position.set(1.7,.035,-.8);
-  const stain=add(new THREE.CircleGeometry(.35,12),mat(0x4d0f0d,.9,0x2a0504,.1),g,false,true); stain.rotation.x=-Math.PI/2; stain.position.set(.95,.04,.95); stain.scale.set(1.7,.8,1);
-  const horse=createHorse(); horse.position.set(-2.25,.05,0); horse.rotation.y=Math.PI/2; g.add(horse);
-  const rein=placeBox(-1.2,1.0,0,.04,.04,1.75,0x2a1a12,"",g); rein.rotation.y=Math.PI/2;
-  merchant=createPerson({id:"merchant",variant:"merchant",color:0x6f8aa6}); merchant.position.set(.78,.06,questDone("merchant")?1.55:1.08); merchant.rotation.z=questDone("merchant")?0:Math.PI/2; merchant.rotation.y=questDone("merchant")?Math.PI:0; g.add(merchant);
-  if(!questDone("merchant")){ beast=createBeast(); beast.position.set(2.05,.05,-.55); beast.rotation.y=-Math.PI/2; g.add(beast); } else { const s=createLabel("RESCUED"); s.scale.set(1.25,.34,1); s.position.set(0,1.75,0); g.add(s); }
-  addCollider(x,z,4.6,3.8,"caravan");
-}
-function createHorse(){
-  const g=new THREE.Group();
-  g.userData.shadowPriority = true;
-  placeBox(0,.78,0,1.2,.56,.42,0x5b3a28,"",g);
-  const neck=placeBox(.52,1.06,0,.26,.58,.24,0x5b3a28,"",g); neck.rotation.z=-.35;
-  placeBox(.78,1.28,0,.38,.28,.28,0x5b3a28,"",g);
-  placeBox(.97,1.25,0,.18,.12,.18,0x2b1b12,"",g);
-  placeBox(-.58,.92,0,.18,.36,.42,0x241711,"",g);
-  for(const x of [-.4,.4]) for(const z of [-.15,.15]){
-    placeBox(x,.34,z,.12,.68,.12,0x3b281d,"",g);
-    placeBox(x,.06,z,.18,.12,.18,0x20140f,"",g);
-  }
-  for(const z of [-.08,.08]){ const eye=add(new THREE.SphereGeometry(.025,8,6),mat(0x09090d),g); eye.position.set(.92,1.32,z); }
-  return g;
-}
-function createBeast(){
-  const g=new THREE.Group();
-  placeBox(0,.62,0,.95,.42,.36,0x111015,"",g);
-  placeBox(-.58,.72,0,.36,.28,.32,0x09090d,"",g);
-  placeBox(-.76,.61,0,.22,.1,.28,0x3a0c0c,"",g);
-  for(const x of [-.32,.32]) for(const z of [-.13,.13]) placeBox(x,.28,z,.11,.46,.11,0x09090d,"",g);
-  for(const z of [-.09,.09]){ const e=add(new THREE.SphereGeometry(.035,8,6),mat(0xff2a1c,.2,0xff2a1c,1.1),g); e.position.set(-.77,.78,z); }
-  const tail=placeCylinder(.57,.72,0,.04,.55,0x0b0b0d,"",g); tail.rotation.z=.8;
-  return g;
-}
-function createBurst(pos,color=0xff7a1c){
-  const group=new THREE.Group(); group.position.copy(pos); world.add(group);
-  for(let i=0;i<22;i++){
-    const s=add(new THREE.SphereGeometry(.06,8,6),mat(color,.32,color,1.5),group,false,false);
-    const a=i/22*Math.PI*2, lift=rand(.4,2.0), spread=rand(1.6,3.6);
-    s.userData.vel=new THREE.Vector3(Math.cos(a)*spread,lift,Math.sin(a)*spread);
-  }
-  const flash=new THREE.PointLight(color,5.5,13); flash.position.set(0,.35,0); group.add(flash);
-  bursts.push({ group, light:flash, life:.52, max:.52 });
-}
-function aimDirection(){
-  return new THREE.Vector3(-Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),-Math.cos(state.yaw)*Math.cos(state.pitch)).normalize();
-}
-function castFireball(mode="action"){
-  const story=mode==="story", strong=mode==="burst";
-  const cooldown=strong?.95:.32, cost=story?0:(strong?7:2);
-  if(!story){
-    if(strong ? state.burstCooldown>0 : state.fireCooldown>0) return;
-    if(state.player.mp < cost){ state.magicPulse=.3; updateMagicUi(); return; }
-    state.player.mp=Math.max(0,state.player.mp-cost);
-    if(strong) state.burstCooldown=state.burstMaxCooldown=cooldown; else state.fireCooldown=state.fireMaxCooldown=cooldown;
-    state.castCooldown=cooldown; state.castMaxCooldown=cooldown;
-    updateHud();
-  }
-  const dir=aimDirection();
-  const start=player.position.clone().add(new THREE.Vector3(0,state.cameraMode==="first"?1.58:1.35,0)).addScaledVector(dir,.48);
-  const ball=add(new THREE.SphereGeometry(strong?.34:.22,16,10),mat(strong?0xffb347:0xff7a1c,.2,strong?0xff8a00:0xff5a00,2.4),world,false,false);
-  ball.position.copy(start);
-  ball.add(new THREE.PointLight(strong?0xffb347:0xff6a1a,strong?3.2:2.2,strong?7:5));
-  let target=null;
-  if(story && beast){ target=new THREE.Vector3(); beast.getWorldPosition(target); target.y=.8; }
-  state.cameraShake=Math.max(state.cameraShake,strong?.08:.035);
-  projectiles.push({ mesh:ball, dir, start:start.clone(), target, t:0, speed: strong?44:34, life:2.5, mode });
-}
-function dodge(){
-  if(state.inDialogue||!state.started)return;
-  state.dodgeTimer=.18;
-  const back=new THREE.Vector3(Math.sin(state.yaw),0,Math.cos(state.yaw));
-  tryMove(back.x*2.8, back.z*2.8, 0);
-  createBurst(player.position.clone().add(new THREE.Vector3(0,.5,0)),0x87c7ff);
-}
-function updateEffects(dt,t){
-  state.castCooldown=Math.max(0,state.castCooldown-dt);
-  state.fireCooldown=Math.max(0,state.fireCooldown-dt);
-  state.burstCooldown=Math.max(0,state.burstCooldown-dt);
-  state.magicPulse=Math.max(0,state.magicPulse-dt);
-  if(state.started&&!state.inDialogue&&state.player.mp<state.player.maxMp) state.player.mp=Math.min(state.player.maxMp,state.player.mp+dt*1.2);
-  updateMagicUi();
-  if(beast&&!questDone("merchant")){ beast.position.x=2.0+Math.sin(t*4.2)*.25; beast.position.y=.05+Math.abs(Math.sin(t*5.2))*.08; beast.rotation.z=Math.sin(t*6)*.1; }
-  if(caravan&&!questDone("merchant")) caravan.rotation.z=Math.sin(t*2.6)*.018;
-  for(let i=projectiles.length-1;i>=0;i--){
-    const p=projectiles[i]; p.t+=dt; p.life-=dt;
-    if(p.target){
-      const k=Math.min(1,p.t*1.8); p.mesh.position.lerpVectors(p.start,p.target,k); if(k>=1) projectileHit(p,i);
-    } else {
-      p.mesh.position.addScaledVector(p.dir,p.speed*dt);
-      p.mesh.scale.setScalar(1+Math.sin(t*18)*.18);
-      if(colliderAt(p.mesh.position.x,p.mesh.position.z,p.mode==="burst"?.36:.22,true) && p.mesh.position.distanceTo(p.start)>1.2) projectileHit(p,i);
-      else if(beast){ const bp=new THREE.Vector3(); beast.getWorldPosition(bp); if(p.mesh.position.distanceTo(bp)<1.2) projectileHit(p,i); }
-      if(p.life<=0 || p.mesh.position.distanceTo(player.position)>100) projectileHit(p,i,false);
-    }
-  }
-  for(let i=bursts.length-1;i>=0;i--){
-    const b=bursts[i]; b.life-=dt;
-    const k=1-b.life/b.max; b.group.scale.setScalar(1+k*2.2);
-    b.group.children.forEach(s=>{ if(s.userData?.vel) s.position.addScaledVector(s.userData.vel,dt); });
-    if(b.light) b.light.intensity=Math.max(0,5.5*(b.life/b.max));
-    if(b.life<=0){ world.remove(b.group); bursts.splice(i,1); }
-  }
-}
-function projectileHit(p,i,explode=true){
-  if(explode){
-    createBurst(p.mesh.position.clone(),p.mode==="burst"?0xffc46b:0xff7a1c);
-    state.cameraShake=Math.max(state.cameraShake,p.mode==="burst"?.18:.11);
-    state.hitStop=Math.max(state.hitStop,p.mode==="burst"?.075:.045);
-  }
-  world.remove(p.mesh); projectiles.splice(i,1);
-  if(beast&&explode){ beast.rotation.z=-.45; beast.position.y+=.15; }
-}
-
-function addNpc(npc){
-  const n=createPerson(npc); n.position.set(npc.position.x,0,npc.position.z); n.userData={...npc,kind:"npc"};
-  const label=createLabel(npc.name); label.position.set(0,2.55,0); n.add(label);
-  scene.add(n); npcs.push(n);
-}
-function createPlayer(){ return createPerson({ id:"player", variant:"player", color:0x24395d }); }
-function personProfile(v, base){
-  const profiles={
-    player:{cloth:base||0x24395d, cape:0x1b2740, hair:0x24202a, leg:0x252d3c, boots:0x39281c, style:"short"},
-    receptionist:{cloth:0x385f73, cape:0xf1dbc5, hair:0xf1dbc5, leg:0x2f4652, boots:0x4b3422, style:"bun"},
-    merchant:{cloth:0x8c6a42, cape:0xb68d55, hair:0x4d3424, leg:0x403126, boots:0x2d1d14, style:"short"},
-    traveler:{cloth:base||0x7f9fbd, cape:0x5d4b39, hair:0x3a2a1d, leg:0x33404a, boots:0x39281c, style:"short"},
-    commoner:{cloth:base||0x7f9fbd, cape:0x6d5d4a, hair:0x3a2a1d, leg:0x3d3b34, boots:0x39281c, style:"bob"},
-    guard:{cloth:0xb77954, cape:0x4d5661, hair:0x2e2218, leg:0x2f3541, boots:0x211711, style:"helmet"},
-    priest:{cloth:0xcfc8b4, cape:0xd5cfbc, hair:0xd5cfbc, leg:0xc7c2b1, boots:0x3a3128, style:"hood", robe:true},
-    pilgrim:{cloth:0xb8ad91, cape:0x8c8068, hair:0x7b5b3f, leg:0x5d5140, boots:0x3a3128, style:"hood"},
-    shady:{cloth:0x272331, cape:0x15131b, hair:0x18151c, leg:0x1f1c24, boots:0x111015, style:"hood"},
-    veteran:{cloth:base||0x8c6f4f, cape:0x5a3d27, hair:0x7b5b3f, leg:0x2f3541, boots:0x2a1b10, style:"short"},
-    adventurer:{cloth:base||0x4d6388, cape:0x38344a, hair:0x5b3a24, leg:0x2f3541, boots:0x2a1b10, style:"short"},
-    guild_guide:{cloth:base||0xd8b36b, cape:0x4a3825, hair:0x3a2a1d, leg:0x2f3541, boots:0x39281c, style:"short"},
-    blacksmith:{cloth:0x6c5a4a, cape:0x2b2520, hair:0x2e2218, leg:0x34302a, boots:0x20140f, style:"short"}
-  };
-  return profiles[v] || profiles.traveler;
-}
-function createPerson(n){
-  const g=new THREE.Group(), v=n.variant||n.id, p=personProfile(v,n.color), skin=0xd8ad84;
-  g.userData.shadowPriority = ["player","guard","receptionist","priest","merchant","adventurer","veteran","blacksmith","shady"].includes(v);
-  body(g,p.cloth,p);
-  head(g,skin,p.hair,p.style);
-  limbs(g,p.cloth,p.leg,p.boots,skin);
-  addRoleDetails(g,v,p,skin);
-  g.userData.modelKind="primitive-person";
-  return g;
-}
-function body(g,color,p){
-  placeBox(0,1.02,0,.74,.92,.38,color,"",g);
-  if(p.robe){ const rb=add(new THREE.ConeGeometry(.53,.98,6),mat(p.cape),g); rb.position.set(0,.55,-.03); rb.rotation.x=Math.PI; }
-  else { const cape=placeBox(0,.88,-.33,.66,.62,.12,p.cape,"",g); cape.rotation.x=.12; }
-  placeBox(0,.74,0,.84,.12,.48,0x8c6740,"",g);
-  placeBox(.28,.76,.25,.16,.16,.08,0xd8b36b,"",g);
-}
-function head(g,skin,hair,style){
-  placeCylinder(0,1.49,0,.08,.14,skin,"",g);
-  add(new THREE.SphereGeometry(.29,20,16),mat(skin),g).position.set(0,1.78,0);
-  [[-.1,1.8,.285],[.1,1.8,.285]].forEach(p=>placeBox(p[0],p[1],p[2],.055,.035,.018,0x17223a,"",g));
-  placeBox(0,1.755,.305,.05,.08,.05,skin,"",g);
-  if(style==="hood"){ const h=add(new THREE.SphereGeometry(.37,16,12),mat(hair),g); h.scale.set(1.06,.93,1.08); h.position.set(0,1.82,-.04); placeBox(0,1.72,.32,.32,.12,.06,0x111015,"",g); return; }
-  if(style==="helmet"){
-    const helm=add(new THREE.SphereGeometry(.335,16,12),mat(0xa8acb6),g); helm.scale.set(1.08,.62,1.04); helm.position.set(0,1.95,-.035);
-    placeBox(0,1.82,.31,.42,.14,.06,0x7f8791,"",g);
-    return;
-  }
-  const cap=add(new THREE.SphereGeometry(.335,18,12),mat(hair),g); cap.scale.set(1.05,.54,1.03); cap.position.set(0,1.95,-.035);
-  [-.19,-.06,.07,.2].forEach((x,i)=>{ const bang=placeBox(x,1.87,.295,.1,.24,.055,hair,"",g); bang.rotation.z=(i-1.5)*.12; });
-  if(style==="bun") add(new THREE.SphereGeometry(.16,12,10),mat(hair),g).position.set(0,1.95,-.28);
-  if(style==="bob") placeBox(0,1.8,-.22,.48,.34,.12,hair,"",g);
-}
-function limbs(g,sleeve,leg,boot,skin){
-  [-1,1].forEach(s=>{
-    const a=placeBox(s*.46,1.05,0,.17,.54,.17,sleeve,"",g); a.rotation.z=s*.16;
-    add(new THREE.SphereGeometry(.085,10,8),mat(skin),g).position.set(s*.52,.72,.03);
-    placeBox(s*.15,.38,0,.19,.64,.19,leg,"",g);
-    placeBox(s*.15,.07,.08,.24,.16,.36,boot,"",g);
-  });
-}
-function addRoleDetails(g,v,p,skin){
-  if(v==="guard"){ placeBox(0,1,.29,.64,.6,.18,0xa8acb6,"",g); const spear=placeCylinder(-.46,1.06,0,.03,2.3,0x6e5134,"",g); spear.rotation.z=.12; placeBox(.42,1.03,.3,.22,.78,.1,0x7f8791,"",g); }
-  if(v==="receptionist") placeBox(0,.78,.27,.48,.62,.12,0xf1dbc5,"",g);
-  if(v==="priest"||v==="pilgrim") [-.12,.12].forEach(x=>placeBox(x,.9,.24,.12,.96,.14,0xd5c089,"",g));
-  if(v==="guild_guide"){ const sash=placeBox(.18,.92,.25,.15,.94,.14,0xd8b36b,"",g); sash.rotation.z=-.5; }
-  if(v==="merchant") { placeBox(.38,.96,.25,.24,.34,.14,0xd8b36b,"",g); addSack(-.42,.74,.18,g); }
-  if(v==="adventurer"||v==="veteran"){ placeBox(-.44,1.02,.28,.16,.78,.1,0x8a8f98,"",g); const sword=placeBox(.5,.86,-.22,.08,.8,.08,0xb7c0c7,"",g); sword.rotation.z=-.65; }
-  if(v==="blacksmith"){ placeBox(0,.95,.28,.58,.58,.12,0x2b2520,"",g); placeBox(.52,.78,.05,.16,.62,.12,0x8a8f98,"",g); }
-  if(v==="shady"){ placeBox(0,1.4,.32,.44,.12,.08,0x0d0b10,"",g); }
-}
-
-
-function loop(){
-  const rawDt=Math.min(clock.getDelta(),.05), t=clock.elapsedTime;
-  const dt=state.hitStop>0?0:rawDt;
-  state.hitStop=Math.max(0,state.hitStop-rawDt);
-  viewKeys(dt); gamepad(dt); move(dt); updateMovers(dt); updateEffects(dt,t);
-  updateCulling(false,rawDt);
-  npcs.forEach((n,i)=>{ if(n.visible!==false && !n.userData.isMover && Math.hypot(player.position.x-n.position.x,player.position.z-n.position.z)<activeQuality.animate.ped){ n.position.y=Math.sin(t*1.6+i*.8)*.02; n.rotation.y=Math.sin(t*.6+i)*.12; } });
-  detect(); cameraUpdate(); renderer.render(scene,camera); requestAnimationFrame(loop);
-}
-function viewKeys(dt){
-  if(!state.started||state.inDialogue)return;
-  state.yaw+=((state.keys.has("ArrowLeft")?1:0)-(state.keys.has("ArrowRight")?1:0))*2.25*dt;
-  state.pitch=THREE.MathUtils.clamp(state.pitch+((state.keys.has("ArrowUp")?1:0)-(state.keys.has("ArrowDown")?1:0))*1.35*dt,-.55,.75);
-}
-function pad(){ const ps=navigator.getGamepads?[...navigator.getGamepads()].filter(Boolean):[]; return ps.find(p=>/dualshock|wireless controller|dualsense|playstation/i.test(p.id))||ps[0]||null; }
-function dz(v){ return Math.abs(v)<.16?0:v; }
-function gamepad(dt){
-  state.choiceCooldown=Math.max(0,state.choiceCooldown-dt);
-  const p=pad(); if(!p||!state.started)return;
-  const now=p.buttons.map(b=>b.pressed), down=i=>now[i]&&!state.padButtons[i];
-  if(state.inDialogue){
-    const y=dz(p.axes[1]||0);
-    if((down(13)||y>.55)&&state.choiceCooldown<=0){ moveChoice(1); state.choiceCooldown=.22; }
-    if((down(12)||y<-.55)&&state.choiceCooldown<=0){ moveChoice(-1); state.choiceCooldown=.22; }
-    if(down(0)) confirmChoice();
-    if(down(1)) closeDialogue();
-    state.padButtons=now; return;
-  }
-  state.yaw-=dz(p.axes[2]||0)*2.8*dt;
-  state.pitch=THREE.MathUtils.clamp(state.pitch-dz(p.axes[3]||0)*1.8*dt,-.55,.75);
-  if(down(0)&&state.activeTarget) interact();
-  if(down(1)) dodge();
-  if(down(2)) castFireball("action");
-  if(down(3)) castFireball("burst");
-  if(down(9)||down(11)) toggleCamera();
-  state.padButtons=now;
-}
-function stick(){
-  const p=pad();
-  return p?{x:dz(p.axes[0]||0),y:-dz(p.axes[1]||0),dash:(p.buttons[7]?.value||0)>.25||p.buttons[10]?.pressed}:{x:0,y:0,dash:false};
-}
-function move(dt){
-  if(!state.started||state.inDialogue)return;
-  const s=stick();
-  let x=(state.keys.has("KeyD")?1:0)-(state.keys.has("KeyA")?1:0)+s.x;
-  let y=(state.keys.has("KeyW")?1:0)-(state.keys.has("KeyS")?1:0)+s.y;
-  if(state.keys.has("KeyJ")){ castFireball("action"); state.keys.delete("KeyJ"); }
-  if(state.keys.has("KeyK")){ dodge(); state.keys.delete("KeyK"); }
-  if(state.keys.has("KeyL")){ castFireball("burst"); state.keys.delete("KeyL"); }
-
-  const up=(state.debug&&state.keys.has("Space")?1:0)-(state.debug&&(state.keys.has("ControlLeft")||state.keys.has("ControlRight"))?1:0);
-  const len=Math.hypot(x,y,up);
-  if(len<.01){ regen(dt,24); state.isDashing=false; return; }
-  x/=Math.max(1,len); y/=Math.max(1,len);
-
-  state.isDashing=(state.keys.has("ShiftLeft")||state.keys.has("ShiftRight")||s.dash)&&state.player.stamina>2;
-  const speed=state.debug?(state.isDashing?72:32):(state.isDashing?19.0:10.0);
-  if(!state.debug) state.isDashing?state.player.stamina=Math.max(0,state.player.stamina-30*dt):regen(dt,18);
-
-  const rx=Math.cos(state.yaw), rz=-Math.sin(state.yaw), fx=-Math.sin(state.yaw), fz=-Math.cos(state.yaw);
-  const dx=(rx*x+fx*y)*speed*dt, dzv=(rz*x+fz*y)*speed*dt, dy=up*speed*dt;
-  tryMove(dx,dzv,dy);
-  if(Math.hypot(dx,dzv)>.001) player.rotation.y=Math.atan2(dx,dzv);
-  staminaText();
-}
-function tryMove(dx,dz,dy){
-  const nx=THREE.MathUtils.clamp(player.position.x+dx,bounds.minX,bounds.maxX);
-  if(state.debug || !isBlocked(nx,player.position.z)) player.position.x=nx;
-  const nz=THREE.MathUtils.clamp(player.position.z+dz,bounds.minZ,bounds.maxZ);
-  if(state.debug || !isBlocked(player.position.x,nz)) player.position.z=nz;
-  player.position.y=state.debug?THREE.MathUtils.clamp(player.position.y+dy,0,90):0;
-  resolveDynamicContacts();
-}
-function regen(dt,a){ state.player.stamina=Math.min(state.player.maxStamina,state.player.stamina+a*dt); staminaText(); }
-function staminaText(){ if(ui.stat.stamina) ui.stat.stamina.textContent=`${Math.round(state.player.stamina)}/${state.player.maxStamina}`; }
-function detect(){
-  let near=null,dist=Infinity;
-  npcs.forEach(n=>{ if(n.visible===false) return; const d=player.position.distanceTo(n.position); if(d<dist){dist=d;near=n.userData;}});
-  locations.forEach(l=>{const d=Math.hypot(player.position.x-l.position.x,player.position.z-l.position.z); if(d<dist){dist=d;near=l;}});
-  const r=near?.radius??2.4;
-  if(near&&dist<r&&!state.inDialogue&&state.started){state.activeTarget=near;ui.hintText.textContent=near.kind==="npc"?"話す":near.name;ui.hint.classList.remove("is-hidden");}
-  else{state.activeTarget=null;ui.hint.classList.add("is-hidden");}
-}
-function cameraUpdate(){
-  const desired=state.cameraMode==="first"?(state.isDashing?76:68):(state.isDashing?63:55);
-  camera.fov+=(desired-camera.fov)*.12; camera.updateProjectionMatrix();
-  const target=new THREE.Vector3(player.position.x,player.position.y+1.08,player.position.z);
-  if(state.cameraMode==="first"){
-    const eye=new THREE.Vector3(player.position.x,player.position.y+1.6,player.position.z);
-    const look=aimDirection();
-    camera.position.lerp(eye,.58); camera.lookAt(eye.clone().add(look)); player.visible=false; applyCameraShake(); return;
-  }
-  player.visible=true;
-  const radius=state.map==="plaza"?12.5:8.8, base=state.map==="plaza"?7.2:5.8;
-  const off=new THREE.Vector3(Math.sin(state.yaw)*radius,base+Math.sin(state.pitch)*5,Math.cos(state.yaw)*radius);
-  camera.position.lerp(target.clone().add(off),.12); camera.lookAt(target);
-  applyCameraShake();
-}
-function applyCameraShake(){
-  if(state.cameraShake<=0) return;
-  const power=state.cameraShake;
-  camera.position.x += rand(-power,power);
-  camera.position.y += rand(-power,power)*.65;
-  state.cameraShake=Math.max(0,state.cameraShake*.84-.002);
-}
-function toggleCamera(){ state.cameraMode=state.cameraMode==="third"?"first":"third"; }
-function toggleDebug(){ state.debug=!state.debug; updateHud(); }
-function applyQuality(id=state.quality, persist=true){
-  if(!QUALITY_PROFILES[id]) id="medium";
-  state.quality=id;
-  activeQuality=QUALITY_PROFILES[id];
-  renderer.setPixelRatio(Math.min(devicePixelRatio, activeQuality.pixelRatio));
-  renderer.shadowMap.enabled=activeQuality.shadows;
-  renderer.shadowMap.needsUpdate=true;
-  if(sunLight) sunLight.castShadow=activeQuality.shadows;
-  if(ui.quality) ui.quality.value=id;
-  if(persist) localStorage.setItem("aureliaQuality",id);
-  updateCulling(true);
-}
-
-function getDialogueId(t){
-  if(t.id==="wake_point"&&questDone("wake"))return"wake_after";
-  if(t.id==="caravan_site"){ if(questDone("merchant"))return"caravan_after"; if(questDone("caravan"))return"caravan_retreat_after"; }
-  if(t.id==="receptionist"&&questDone("register"))return"reception_after";
-  if(t.id==="priest"&&questDone("church"))return"priest_after";
-  return t.dialogue;
-}
-function interact(){
-  const t=state.activeTarget; if(!t)return;
-  if(t.targetMap){ if(t.id==="guild_door") markDone(["guild"]); loadMap(t.targetMap,t.spawn); return; }
-  const id=getDialogueId(t); if(id) openDialogue(id);
-}
-function openDialogue(id){
-  state.dialogueId=id; state.dialogueLine=0; state.selectedChoice=0; state.inDialogue=true;
-  if(id==="street_attack_start") state.yaw=-.2;
-  if(id==="fireball_first") castFireball("story");
-  ui.choices.innerHTML=""; ui.dialog.classList.remove("is-hidden"); ui.hint.classList.add("is-hidden"); renderDialogue();
-}
-function closeDialogue(){ state.inDialogue=false; state.dialogueId=null; ui.dialog.classList.add("is-hidden"); }
-function cur(){ return data.dialogues[state.dialogueId]||extraDialogues[state.dialogueId]; }
-function renderDialogue(){
-  const d=cur(); if(!d)return closeDialogue();
-  ui.speaker.textContent=d.speaker||""; ui.line.textContent=d.lines[state.dialogueLine]||""; ui.choices.innerHTML="";
-  if(state.dialogueLine>=d.lines.length-1&&d.choices) d.choices.forEach((c,i)=>{ const b=document.createElement("button"); b.type="button"; b.textContent=c.text; b.classList.toggle("is-selected",i===state.selectedChoice); b.onclick=()=>choice(c); ui.choices.appendChild(b); });
-}
-function advanceDialogue(){ const d=cur(); if(!d)return; if(state.dialogueLine<d.lines.length-1){ state.dialogueLine++; state.selectedChoice=0; renderDialogue(); } else if(d.choices?.length) confirmChoice(); else closeDialogue(); }
-function moveChoice(delta){ const d=cur(); if(!d?.choices?.length||state.dialogueLine<d.lines.length-1)return; state.selectedChoice=(state.selectedChoice+delta+d.choices.length)%d.choices.length; renderDialogue(); }
-function confirmChoice(){ const d=cur(); if(!d?.choices?.length||state.dialogueLine<d.lines.length-1){ advanceDialogue(); return; } choice(d.choices[state.selectedChoice]||d.choices[0]); }
-function choice(c){
-  if(c.stat) Object.entries(c.stat).forEach(([k,v])=>state.player[k]=Number(state.player[k]||0)+Number(v));
-  if(c.set) Object.entries(c.set).forEach(([p,v])=>setDeep(p,v));
-  if(c.objective)setObjective(c.objective);
-  if(c.done)markDone(c.done);
-  if(c.to==="fireball_first")castFireball("story");
-  updateHud();
-  if(c.targetMap){ closeDialogue(); loadMap(c.targetMap,c.spawn||{x:0,z:0}); return; }
-  if(c.to){ state.dialogueId=c.to; state.dialogueLine=0; state.selectedChoice=0; renderDialogue(); } else closeDialogue();
-}
-function setObjective(t){ data.objective=t; ui.objective.textContent=t; }
-function markDone(ids){ ids.forEach(id=>{ const q=state.quest.find(x=>x.id===id); if(q)q.done=true; }); if(ids.includes("merchant")) resolveCaravan(); renderQuests(); }
-function resolveCaravan(){ if(beast) beast.visible=false; if(merchant){ merchant.rotation.set(0,Math.PI,0); merchant.position.set(.78,.06,1.55); } }
-function setDeep(path,val){ const ks=path.split("."); let t=state; while(ks.length>1){ const k=ks.shift(); t[k]??={}; t=t[k]; } t[ks[0]]=val; }
-function updateHud(){ const m=data.maps[state.map]; ui.stat.name.textContent=state.player.name; ui.stat.hp.textContent=`${Math.round(state.player.hp)}/${state.player.maxHp}`; ui.stat.mp.textContent=`${Math.floor(state.player.mp)}/${state.player.maxMp}`; staminaText(); ui.stat.rank.textContent=state.player.rank; ui.stat.contract.textContent=state.player.contract; ui.objective.textContent=(state.debug?"[DEBUG FLY] ":"")+(data.objective||""); ui.area.textContent=m.name; ui.map.textContent=m.minimap; renderQuests(); updateMagicUi(); }
-function updateMagicUi(){
-  if(ui.stat.mp) ui.stat.mp.textContent=`${Math.floor(state.player.mp)}/${state.player.maxMp}`;
-  if(ui.cooldowns.fire) ui.cooldowns.fire.value=state.fireMaxCooldown?1-state.fireCooldown/state.fireMaxCooldown:1;
-  if(ui.cooldowns.burst) ui.cooldowns.burst.value=state.burstMaxCooldown?1-state.burstCooldown/state.burstMaxCooldown:1;
-}
-function renderQuests(){ ui.quests.innerHTML=""; state.quest.forEach(q=>{ const li=document.createElement("li"); li.textContent=q.text; if(q.done)li.classList.add("done"); ui.quests.appendChild(li); }); }
-function createLabel(text){
-  const c=document.createElement("canvas"),x=c.getContext("2d"); c.width=512;c.height=128;
-  x.fillStyle="rgba(10,12,18,.72)"; round(x,12,20,488,88,18); x.fill();
-  x.strokeStyle="rgba(216,179,107,.75)"; x.lineWidth=4; round(x,12,20,488,88,18); x.stroke();
-  x.fillStyle="#f6efe1"; x.font="bold 38px sans-serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(text,256,64);
-  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true})); s.scale.set(2.4,.6,1); return s;
-}
-function round(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
-
-ui.start.onclick=()=>{ state.started=true; ui.title.classList.add("is-hidden"); };
-if(ui.quality){
-  ui.quality.value=state.quality;
-  ui.quality.onchange=()=>applyQuality(ui.quality.value);
-}
-addEventListener("keydown",e=>{
-  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault();
-  if(e.code==="Backquote"||e.code==="F3"){ e.preventDefault(); return toggleDebug(); }
-  if(state.inDialogue){
-    if(e.code==="ArrowDown")return moveChoice(1);
-    if(e.code==="ArrowUp")return moveChoice(-1);
-    if(e.code==="Escape")return closeDialogue();
-    if(e.code==="Enter"||e.code==="Space"){e.preventDefault();return advanceDialogue();}
-  }
-  if(e.code==="KeyF")return toggleCamera();
-  if(e.code==="KeyE"&&state.activeTarget)return interact();
-  state.keys.add(e.code);
-});
-addEventListener("keyup",e=>state.keys.delete(e.code));
-ui.canvas.addEventListener("pointerdown",e=>{state.dragging=true;state.lastX=e.clientX;state.lastY=e.clientY;});
-addEventListener("pointerup",()=>state.dragging=false);
-addEventListener("pointermove",e=>{
-  if(!state.dragging||state.inDialogue)return;
-  state.yaw-=(e.clientX-state.lastX)*.006;
-  state.pitch=THREE.MathUtils.clamp(state.pitch-(e.clientY-state.lastY)*.004,-.55,.75);
-  state.lastX=e.clientX; state.lastY=e.clientY;
-});
-addEventListener("resize",()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+function house(x, z, w, d, h, color, sign = null, important = false, angle = 0) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle; world.add(g); const sH = Math.min(1.1, h * .3), fz = d * .48; box(0, sH / 2, 0, w, sH, d, 0x6f6253, "", g); box(0, sH + (h - sH) / 2, 0, w * .96, h - sH, d * .96, color, "", g); box(0, sH + .95, fz + .07, 1.3, Math.min(1.9, h - sH - .3), .14, 0x2a1c12, "", g); for (const wx of [-w * .29, w * .29]) { box(wx, h - .78, fz + .02, .76, .78, .05, 0x2a1c12, "", g); const gl = add(boxGeo(.58, .6, .05), mat(0xffd486, .4, 0xffb74d, .82), g); gl.position.set(wx, h - .78, fz + .05); } const rh = Math.max(1.3, w * .36), a = Math.atan2(rh, w / 2), L = Math.hypot(w / 2, rh) * 1.05, rc = pick([0x6e2f28, 0x46342a, 0x32506c, 0x2e463a]); for (const s of [-1, 1]) { const pl = add(boxGeo(L, .22, d * 1.12), mat(rc), g, important); pl.position.set(s * w / 4, h + rh / 2, 0); pl.rotation.z = -s * a; } box(0, h + rh, 0, .2, .2, d * 1.14, 0x241a12, "", g); for (const s of [-1, 1]) { const gb = add(unitGable(), mat(color), g); gb.scale.set(w / 2, rh, 1); gb.position.set(0, h, s * fz); if (s < 0) gb.rotation.y = Math.PI; } if (important) { box(w * .32, h + rh * .55, -d * .22, .5, rh * 1.2, .5, 0x4a3a2c, "", g); for (const bx of [-w * .42, 0, w * .42]) box(bx, sH + (h - sH) / 2, fz + .02, .1, h - sH, .05, 0x3b2a1d, "", g); box(0, h - .12, fz + .02, w * .92, .14, .06, 0x3b2a1d, "", g); } if (sign) { box(0, h - .25, fz + .5, .5, .08, .5, 0x241a12, "", g); const lab = label(sign); lab.position.set(0, h - .8, fz + .6); lab.scale.set(1.7, .42, 1); g.add(lab); } const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, important ? "major" : "house"); cull(g, x, z, important ? 900 : 360); }
+function slumHouse(x, z, angle = 0) { const w = rand(5, 10), d = rand(5, 9), h = rand(3, 6); const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle + rand(-.08, .08); world.add(g); box(0, h / 2, 0, w, h, d, pick([0x4f4238, 0x5d4b39, 0x6d5237]), "", g); const roof = box(0, h + .45, 0, w * 1.1, .8, d * 1.05, pick([0x2d2520, 0x3b2a1e, 0x4d2f28]), "", g); roof.rotation.z = rand(-.08, .08); const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, "slumHouse"); cull(g, x, z, 340); }
+function stall(x, z, color) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = roadFacingAngle(x, z); world.add(g); box(0, .35, 0, 3, .7, 1.7, 0x6a4d35, "", g); box(0, 1.35, 0, 3.5, .14, 2.3, color, "", g); for (let i = 0; i < 4; i++) { const item = add(new THREE.DodecahedronGeometry(.16, 0), mat(pick([0xbf5545, 0xd8b36b, 0x5f9056, 0x8f6b3f])), g); item.position.set(rand(-1.1, 1.1), .85, rand(-.5, .5)); } const aabb = rotatedAabb(3.5, 2.3, g.rotation.y); addCollider(x, z, aabb.w, aabb.d, "stall"); cull(g, x, z, 340); }
+function addCaravan(x, z) { const g = cart(); g.position.set(x, 0, z); g.rotation.y = -.22; world.add(g); addNpc("merchant", x + .8, z + 1.4, 0x6f8aa6, "商人", done("merchant") ? "caravan_after" : "caravan_attack"); if (!done("merchant")) { const beast = createBeast(); beast.position.set(x + 2.1, 0, z - .6); beast.rotation.y = -Math.PI / 2; world.add(beast); } addCollider(x, z, 4.2, 3.4, "caravan"); cull(g, x, z, 500); }
+function cart() { const g = new THREE.Group(); box(0, .55, 0, 2.8, .8, 1.6, 0x70482c, "", g); const h = createHorse(); h.position.set(0, 0, -1.55); g.add(h); for (const sx of [-1.3, 1.3]) for (const sz of [-.7, .7]) { const w = add(new THREE.TorusGeometry(.36, .07, 8, 18), mat(0x2c2018), g); w.position.set(sx, .35, sz); w.rotation.y = Math.PI / 2; } return g; }
+function createHorse() { const g = new THREE.Group(); box(0, .78, 0, 1.15, .55, .38, 0x5b3a28, "", g); const neck = box(.5, 1.05, 0, .25, .55, .22, 0x5b3a28, "", g); neck.rotation.z = -.35; box(.75, 1.25, 0, .35, .25, .25, 0x5b3a28, "", g); for (const x of [-.38, .38]) for (const z of [-.14, .14]) box(x, .34, z, .12, .65, .12, 0x3b281d, "", g); return g; }
+function createBeast() { const g = new THREE.Group(); box(0, .62, 0, .95, .42, .36, 0x111015, "", g); box(-.58, .72, 0, .36, .28, .32, 0x09090d, "", g); box(-.76, .61, 0, .22, .1, .28, 0x3a0c0c, "", g); return g; }
+function addNpc(variant, x, z, color, name, dialogue) { const n = createPerson(variant, color); n.position.set(x, 0, z); n.userData = { kind: "npc", id: dialogue, name, dialogue, r: .8 }; const lab = label(name); lab.position.set(0, 2.55, 0); lab.scale.set(1.6, .4, 1); n.add(lab); scene.add(n); npcs.push(n); return n; }
+function createPerson(variant = "traveler", color = 0x6f8aa6) { const g = new THREE.Group(); const skin = 0xd8ad84, hair = variant === "receptionist" ? 0xf1dbc5 : variant === "priest" || variant === "faithful" ? 0xd5cfbc : variant === "merchant" ? 0x5a392a : 0x2e2218; body(g, color, variant === "priest" || variant === "faithful" ? 0xcfc8b4 : null); head(g, skin, hair, variant === "priest" ? "hood" : "short"); limbs(g, color, 0x252d3c, 0x39281c, skin); if (variant === "guard") { box(0, 1, .28, .62, .58, .18, 0xa8acb6, "", g); const spear = cyl(-.42, 1.05, 0, .03, 2.2, 0x6e5134, "", g); spear.rotation.z = .1; } if (variant === "adventurer") { const blade = box(.43, 1.02, -.28, .08, .8, .08, 0xc8cbd0, "", g); blade.rotation.z = .45; } return g; }
+function body(g, color, robe) { box(0, 1.02, 0, .74, .92, .38, color, "", g); if (robe) { const rb = add(new THREE.ConeGeometry(.5, .95, 6), mat(robe), g); rb.position.set(0, .55, -.03); rb.rotation.x = Math.PI; } else box(0, .86, -.31, .62, .55, .12, 0x1b2740, "", g); box(0, .74, 0, .82, .11, .46, 0x8c6740, "", g); }
+function head(g, skin, hair, style) { cyl(0, 1.49, 0, .08, .14, skin, "", g); add(new THREE.SphereGeometry(.29, 16, 12), mat(skin), g).position.set(0, 1.78, 0); const cap = add(new THREE.SphereGeometry(.335, 14, 10), mat(hair), g); cap.scale.set(1.05, style === "hood" ? .9 : .54, 1.03); cap.position.set(0, style === "hood" ? 1.82 : 1.95, -.035); for (const x of [-.17, 0, .17]) box(x, 1.87, .295, .11, .24, .055, hair, "", g); }
+function limbs(g, sleeve, leg, boot, skin) { for (const s of [-1, 1]) { const a = box(s * .46, 1.05, 0, .17, .52, .17, sleeve, "", g); a.rotation.z = s * .16; add(new THREE.SphereGeometry(.085, 8, 6), mat(skin), g).position.set(s * .52, .72, .03); box(s * .15, .38, 0, .19, .62, .19, leg, "", g); box(s * .15, .07, .08, .22, .16, .34, boot, "", g); } }
+function room(w, d, h, color) { for (const [x, z, ww, dd] of [[0, -d / 2, w, .35], [-w / 2, 0, .35, d], [w / 2, 0, .35, d], [-w * .3, d / 2, w * .4, .35], [w * .3, d / 2, w * .4, .35]]) box(x, h / 2, z, ww, h, dd, color, "wall"); }
+function addQuestBoard(x, z) { box(x, 1.25, z, .18, 2.2, 2.2, 0x4a301c, "questBoard", world, true); }
+function crates(x, z, n) { for (let i = 0; i < n; i++) box(x + (i % 2) * .75, .35 + Math.floor(i / 2) * .38, z + Math.floor(i / 2) * .75, .7, .7, .7, 0x735334, "crate"); }
+function addRock(x, z, s) { const r = add(new THREE.DodecahedronGeometry(s, 0), mat(0x6b6b62), world); r.position.set(x, .2, z); r.scale.y = .55; addCollider(x, z, s * 1.2, s * 1.2, "rock"); cull(r, x, z, 300); }
+function addTree(x, z, s, solid) { const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g); cyl(0, .75 * s, 0, .18 * s, 1.5 * s, 0x5b3a24, "", g); const l1 = add(new THREE.DodecahedronGeometry(s, 0), mat(0x2f6f45), g); l1.position.y = 1.8 * s; const l2 = add(new THREE.DodecahedronGeometry(.65 * s, 0), mat(0x3d8a59), g); l2.position.set(.35 * s, 2.35 * s, -.12 * s); if (solid) addCollider(x, z, .9 * s, .9 * s, "tree"); cull(g, x, z, 360); }
+function lamp(x, z) { const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g); cyl(0, 1.5, 0, .09, 3, 0x2f2a25, "", g); box(0, 3.06, 0, .34, .44, .34, 0x35302a, "", g); const fl = add(boxGeo(.2, .3, .2), mat(0xffd27a, .35, 0xffb637, 1.3), g); fl.position.set(0, 3.04, 0); cull(g, x, z, 330); }
+function barrel(x, z) { const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g); cyl(0, .46, 0, .34, .92, 0x6e4c2d, "", g); for (const yy of [.18, .74]) { const r = add(new THREE.TorusGeometry(.35, .035, 6, 14), mat(0x32261a), g); r.position.y = yy; r.rotation.x = Math.PI / 2; } addCollider(x, z, .76, .76, "barrel"); cull(g, x, z, 300); }
+function well(x, z) { const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g); cyl(0, .55, 0, 1.2, 1.1, 0x7b756a, "", g); cyl(0, 1, 0, 1, .12, 0x3c4750, "", g); for (const s of [-1, 1]) box(s * 1.05, 1.7, 0, .18, 2.3, .18, 0x4a3320, "", g); box(0, 2.9, 0, 2.7, .22, 1.8, 0x4d2f28, "", g); cyl(0, 2.1, 0, .07, .8, 0x2a2018, "", g); addCollider(x, z, 2.5, 2.5, "well"); cull(g, x, z, 520); }
+function bench(x, z, angle = 0) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle; world.add(g); box(0, .45, 0, 1.9, .12, .52, 0x6a4a30, "", g); box(0, .76, -.22, 1.9, .5, .1, 0x5d4029, "", g); for (const sx of [-.78, .78]) box(sx, .22, 0, .12, .44, .46, 0x4a3320, "", g); addCollider(x, z, 1.9, .6, "bench"); cull(g, x, z, 260); }
+function flowerBox(x, z) { const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g); box(0, .3, 0, 1.4, .5, .52, 0x6e4a2c, "", g); for (let i = 0; i < 5; i++) { const f = add(new THREE.SphereGeometry(.13, 6, 5), mat(pick([0xd44a5a, 0xe3b34a, 0xc56fce, 0xe8e0c8])), g); f.position.set(rand(-.55, .55), .68, rand(-.14, .14)); } cull(g, x, z, 220); }
+function brazier(x, z) { const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g); cyl(0, .5, 0, .18, 1, 0x2a2620, "", g); cyl(0, 1.05, 0, .42, .35, 0x3a342c, "", g); const fire = add(new THREE.ConeGeometry(.32, .72, 7), mat(0xff8a2a, .3, 0xff6a12, 2.4), g); fire.position.y = 1.45; addCollider(x, z, .9, .9, "brazier"); cull(g, x, z, 380); }
+function streetDressing() { for (let t = -620; t <= 620; t += 38) { for (const s of [-1, 1]) { lamp(s * 14, t); lamp(t, s * 14); if (Math.abs(t) > 72) { const r = Math.random(); if (r < .34) crates(s * 17, t + 3, Math.floor(rand(2, 5))); else if (r < .56) barrel(s * 17, t - 2); else if (r < .68) bench(s * 17, t, Math.PI / 2); const r2 = Math.random(); if (r2 < .32) crates(t + 3, s * 17, Math.floor(rand(2, 5))); else if (r2 < .54) barrel(t - 2, s * 17); } } } for (const [wx, wz] of [[150, -40], [110, 44], [-150, -40], [255, 44], [-360, 205]]) well(wx, wz); for (const [bx, bz] of [[18, 575], [-18, 575], [44, 34], [-44, 34], [34, -120], [-34, -120]]) brazier(bx, bz); for (let a = 0; a < Math.PI * 2; a += Math.PI / 7) flowerBox(Math.cos(a) * 30, Math.sin(a) * 30); for (let a = 0; a < Math.PI * 2; a += Math.PI / 2) bench(Math.cos(a) * 35, Math.sin(a) * 35, a + Math.PI / 2); for (let i = 0; i < 12 * quality.props; i++) addTree(-250 + rand(-95, 95), -350 + rand(-70, 70), rand(1, 1.7), true); }
+function fountain(x, z, s) { cyl(x, .4 * s, z, 1.8 * s, .8 * s, 0x6f7a80, "fountain", world, true); const w = add(new THREE.CylinderGeometry(1.35 * s, 1.35 * s, .08, 24), mat(0x69a7d2, .25, 0x69a7d2, .12), world); w.position.set(x, .85 * s, z); cull(w, x, z, 700); }
+function addSign(x, z, text) { cyl(x, .75, z, .08, 1.5, 0x332315); const s = label(text); s.scale.set(1.55, .42, 1); s.position.set(x, 1.75, z); world.add(s); cull(s, x, z, 700); }
+function alleyDetails(x, z) { for (let i = 0; i < 12; i++) { crates(x + rand(-25, 25), z + rand(-20, 20), 2); lamp(x + rand(-35, 35), z + rand(-35, 35)); } const circle = add(new THREE.TorusGeometry(3, .08, 8, 30), mat(0x7446aa, .45, 0x5c28ff, .6), world); circle.position.set(x, .08, z); circle.rotation.x = Math.PI / 2; cull(circle, x, z, 700); }
+function addMarker(l) { const ring = add(new THREE.TorusGeometry(.9, .035, 8, 32), mat(l.targetMap ? 0xd8b36b : 0x87c7ff, .42, l.targetMap ? 0xd8b36b : 0x87c7ff, .7), world); ring.position.set(l.x, .08, l.z); ring.rotation.x = Math.PI / 2; cull(ring, l.x, l.z, 800); }
+function label(text) { const c = document.createElement("canvas"), x = c.getContext("2d"); c.width = 512; c.height = 128; x.fillStyle = "rgba(10,12,18,.72)"; round(x, 12, 20, 488, 88, 18); x.fill(); x.strokeStyle = "rgba(216,179,107,.75)"; x.lineWidth = 4; round(x, 12, 20, 488, 88, 18); x.stroke(); x.fillStyle = "#f6efe1"; x.font = "bold 38px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(text, 256, 64); return new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true })); }
+function round(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function updateMovers(dt) { const px = player.position.x, pz = player.position.z; for (const m of movers) { const updateRange = m.type === "cart" ? quality.cull * 1.25 : quality.cull; if (!state.debug && Math.hypot(px - m.obj.position.x, pz - m.obj.position.z) > updateRange) continue; if (m.obj.visible === false) continue; if (m.wait > 0) { m.wait -= dt; continue; } const t = m.path[m.index], dx = t[0] - m.obj.position.x, dz = t[1] - m.obj.position.z, dist = Math.hypot(dx, dz); if (dist < 1.5) { m.index = (m.index + 1) % m.path.length; if (m.type === "ped") m.wait = rand(.2, 1.3); continue; } const vx = dx / dist, vz = dz / dist; m.obj.position.x += vx * m.speed * dt; m.obj.position.z += vz * m.speed * dt; m.obj.rotation.y = Math.atan2(vx, vz); if (m.type === "ped") m.obj.position.y = Math.abs(Math.sin(clock.elapsedTime * 5)) * .025; } }
+function updateCulling() { const px = player.position.x, pz = player.position.z; for (const c of cullables) c.obj.visible = state.debug || Math.hypot(px - c.x, pz - c.z) < c.range; for (const n of npcs) n.visible = state.debug || Math.hypot(px - n.position.x, pz - n.position.z) < quality.cull; }
+function castFireball(mode = "fire", free = false) { if (!state.started || !state.loaded) return; const burst = mode === "burst"; if (!free && (burst ? state.burstCooldown : state.fireCooldown) > 0) return; const cost = burst ? 8 : 3; if (!free && state.player.mp < cost) return; if (!free) { state.player.mp -= cost; burst ? state.burstCooldown = .95 : state.fireCooldown = .32; } const dir = new THREE.Vector3(); camera.getWorldDirection(dir); const start = new THREE.Vector3(); if (state.cameraMode === "first") { camera.getWorldPosition(start); const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize(); start.addScaledVector(dir, 1.05).addScaledVector(right, .26).add(new THREE.Vector3(0, -.2, 0)); } else { start.copy(player.position).add(new THREE.Vector3(0, 1.35, 0)).addScaledVector(dir, 1.0); } const ball = add(new THREE.SphereGeometry(burst ? .34 : .22, 16, 10), mat(0xff7a1c, .2, 0xff5a00, 2.4), world); ball.position.copy(start); const light = new THREE.PointLight(0xff7a2a, burst ? 6 : 3.6, burst ? 16 : 11, 2); ball.add(light); burstAt(start.clone(), burst ? 0xffd27a : 0xffa64a); state.shake = Math.max(state.shake, .12); projectiles.push({ ball, dir, life: 1.0, speed: burst ? 42 : 32, burst }); updateHud(); }
+function crystalEffect() { const pos = player.position.clone().add(new THREE.Vector3(0, 1.4, -1)); burstAt(pos, 0x80d8ff); state.shake = .25; }
+function updateEffects(dt) { state.fireCooldown = Math.max(0, state.fireCooldown - dt); state.burstCooldown = Math.max(0, state.burstCooldown - dt); state.shake = Math.max(0, state.shake - dt * 3); if (ui.cooldowns.fire) ui.cooldowns.fire.value = state.fireCooldown ? 1 - state.fireCooldown / .32 : 1; if (ui.cooldowns.burst) ui.cooldowns.burst.value = state.burstCooldown ? 1 - state.burstCooldown / .95 : 1; for (let i = projectiles.length - 1; i >= 0; i--) { const p = projectiles[i]; p.life -= dt; p.ball.position.addScaledVector(p.dir, p.speed * dt); const hit = !state.debug && p.life < .95 && (p.ball.position.y <= .18 || blocked(p.ball.position.x, p.ball.position.z, .25)); if (p.life <= 0 || hit) { burstAt(p.ball.position, p.burst ? 0xffd27a : 0xff7a1c); state.hitStop = Math.max(state.hitStop, .06); world.remove(p.ball); projectiles.splice(i, 1); } } for (let i = bursts.length - 1; i >= 0; i--) { const b = bursts[i]; b.life -= dt; b.g.scale.setScalar(1 + (1 - b.life / b.max) * 2); if (b.life <= 0) { world.remove(b.g); bursts.splice(i, 1); } } }
+function burstAt(pos, color = 0xff7a1c) { const g = new THREE.Group(); g.position.copy(pos); world.add(g); for (let i = 0; i < 12; i++) add(new THREE.SphereGeometry(.07, 8, 6), mat(color, .32, color, 1.4), g); bursts.push({ g, life: .45, max: .45 }); state.shake = .18; }
+function loop() { let dt = Math.min(clock.getDelta(), .05); if (state.hitStop > 0) { state.hitStop -= dt; dt *= .2; } if (state.started && state.loaded) { controls(dt); updateMovers(dt); updateEffects(dt); detect(); updateCulling(); cameraUpdate(); } renderer.render(scene, camera); requestAnimationFrame(loop); }
+function controls(dt) { handlePad(); if (state.inDialogue) return; let x = (state.keys.has("KeyD") ? 1 : 0) - (state.keys.has("KeyA") ? 1 : 0); let y = (state.keys.has("KeyW") ? 1 : 0) - (state.keys.has("KeyS") ? 1 : 0); const p = gamepad(); if (p) { x += dead(p.axes[0] || 0); y += -dead(p.axes[1] || 0); state.yaw -= dead(p.axes[2] || 0) * 2.8 * dt; state.pitch = THREE.MathUtils.clamp(state.pitch - dead(p.axes[3] || 0) * 1.8 * dt, -.55, .75); } state.yaw += ((state.keys.has("ArrowLeft") ? 1 : 0) - (state.keys.has("ArrowRight") ? 1 : 0)) * 2.25 * dt; state.pitch = THREE.MathUtils.clamp(state.pitch + ((state.keys.has("ArrowUp") ? 1 : 0) - (state.keys.has("ArrowDown") ? 1 : 0)) * 1.35 * dt, -.55, .75); if (state.keys.has("KeyJ")) { castFireball("fire"); state.keys.delete("KeyJ"); } if (state.keys.has("KeyL")) { castFireball("burst"); state.keys.delete("KeyL"); } if (state.keys.has("KeyK")) { dodge(); state.keys.delete("KeyK"); } const up = (state.debug && state.keys.has("Space") ? 1 : 0) - (state.debug && (state.keys.has("ControlLeft") || state.keys.has("ControlRight")) ? 1 : 0); const len = Math.hypot(x, y, up); if (len < .01) { regen(dt, 22); return; } x /= Math.max(1, len); y /= Math.max(1, len); const dash = state.keys.has("ShiftLeft") || state.keys.has("ShiftRight") || (p && (p.buttons[7]?.value || 0) > .25); state.isDashing = dash && state.player.stamina > 2; const speed = state.debug ? (state.isDashing ? 120 : 55) : (state.isDashing ? 19.0 : 10.0); if (!state.debug) state.isDashing ? state.player.stamina = Math.max(0, state.player.stamina - 30 * dt) : regen(dt, 18); const rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw), fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw); move((rx * x + fx * y) * speed * dt, (rz * x + fz * y) * speed * dt, up * speed * dt); }
+function move(dx, dz, dy) { const nx = THREE.MathUtils.clamp(player.position.x + dx, bounds.minX, bounds.maxX); if (state.debug || !blocked(nx, player.position.z)) player.position.x = nx; const nz = THREE.MathUtils.clamp(player.position.z + dz, bounds.minZ, bounds.maxZ); if (state.debug || !blocked(player.position.x, nz)) player.position.z = nz; player.position.y = state.debug ? THREE.MathUtils.clamp(player.position.y + dy, 0, 160) : 0; if (Math.hypot(dx, dz) > .001) player.rotation.y = Math.atan2(dx, dz); staminaText(); }
+function dodge() { const back = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw)); move(back.x * 2.8, back.z * 2.8, 0); burstAt(player.position.clone().add(new THREE.Vector3(0, .5, 0)), 0x87c7ff); }
+function regen(dt, a) { state.player.stamina = Math.min(state.player.maxStamina, state.player.stamina + a * dt); staminaText(); }
+function gamepad() { const ps = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : []; return ps.find((p) => /dualshock|wireless controller|dualsense|playstation/i.test(p.id)) || ps[0] || null; }
+function dead(v) { return Math.abs(v) < .16 ? 0 : v; }
+function handlePad() { const p = gamepad(); if (!p) return; const now = p.buttons.map((b) => b.pressed); const down = (i) => now[i] && !state.padButtons[i]; if (state.inDialogue) { const y = dead(p.axes[1] || 0); if (down(13) || y > .65) moveChoice(1); if (down(12) || y < -.65) moveChoice(-1); if (down(0)) advance(); if (down(1)) closeDialogue(); state.padButtons = now; return; } if (down(0) && state.active) interact(); if (down(1)) dodge(); if (down(2)) castFireball("fire"); if (down(3)) castFireball("burst"); if (down(9) || down(11)) state.cameraMode = state.cameraMode === "third" ? "first" : "third"; state.padButtons = now; }
+function detect() { let near = null, dist = Infinity; for (const n of npcs) { if (n.visible === false) continue; const d = player.position.distanceTo(n.position); if (d < dist) { dist = d; near = n.userData; } } for (const l of locations) { const d = Math.hypot(player.position.x - l.x, player.position.z - l.z); if (d < dist) { dist = d; near = l; } } if (near && dist < (near.r || 2.5) && !state.inDialogue) { state.active = near; ui.hintText.textContent = near.name || "調べる"; ui.hint.classList.remove("is-hidden"); } else { state.active = null; ui.hint.classList.add("is-hidden"); } }
+function cameraUpdate() { const target = new THREE.Vector3(player.position.x, player.position.y + 1.08, player.position.z); if (state.cameraMode === "first") { const eye = new THREE.Vector3(player.position.x, player.position.y + 1.55, player.position.z); const look = new THREE.Vector3(-Math.sin(state.yaw) * Math.cos(state.pitch), Math.sin(state.pitch), -Math.cos(state.yaw) * Math.cos(state.pitch)); camera.position.lerp(eye, .45); if (state.shake > 0) camera.position.add(new THREE.Vector3(rand(-.035, .035), rand(-.025, .025), 0)); camera.lookAt(eye.clone().add(look)); player.visible = false; return; } player.visible = true; const radius = state.map === "plaza" ? 18 : 8.8, base = state.map === "plaza" ? 10 : 5.8; const off = new THREE.Vector3(Math.sin(state.yaw) * radius, base + Math.sin(state.pitch) * 7, Math.cos(state.yaw) * radius); camera.position.lerp(target.clone().add(off), .12); if (state.shake > 0) camera.position.add(new THREE.Vector3(rand(-.08, .08), rand(-.04, .04), rand(-.08, .08))); camera.lookAt(target); }
+// 進行テーブル: 基準会話ID -> { q: 完了判定クエスト, after: 完了後の会話, mid?: 途中会話, midUntil?: midを抜ける条件クエスト }
+// 同じイベントを二度発生させず、完了後は自動で「後日談」会話へ切り替える単一の真実源。
+const PROGRESS = {
+  caravan_attack: { q: "merchant", after: "caravan_after" },
+  north_gate: { q: "gate", after: "north_gate_after" },
+  plaza: { q: "plaza", after: "plaza_after" },
+  guild_reception: { q: "guild_apply", after: "guild_reception_after", mid: "mana_measure", midUntil: "mana_test" },
+  mana_measure: { q: "mana_test", after: "mana_after" },
+  guildmaster: { q: "provisional", after: "guildmaster_after" },
+  church: { q: "church_record", after: "church_after" },
+  market: { q: "market", after: "market_after" },
+  training: { q: "training", after: "training_after" },
+  mock_battle: { q: "mock_battle", after: "mock_after" },
+  alley: { q: "alley", after: "alley_after" }
+};
+function resolveDialogueId(t) { const base = t.dialogue || t.id || "generic"; const rule = PROGRESS[base]; if (rule && done(rule.q)) { if (rule.mid && !done(rule.midUntil)) return rule.mid; return rule.after; } return base; }
+function interact() { const t = state.active; if (!t) return; const targetMap = t.targetMap || t.map; if (targetMap) { loadMap(targetMap, t.spawn || initialSpawn(targetMap)); return; } openDialogue(resolveDialogueId(t)); }
+function openDialogue(id) { state.dialogueId = id; state.lineIndex = 0; state.selected = 0; state.inDialogue = true; ui.dialog.classList.remove("is-hidden"); renderDialogue(); }
+function closeDialogue() { state.inDialogue = false; ui.dialog.classList.add("is-hidden"); }
+function currentDialogue() { return DIALOGUES[state.dialogueId] || (data.dialogues && data.dialogues[state.dialogueId]) || DIALOGUES.generic; }
+function renderDialogue() { const d = currentDialogue(); ui.speaker.textContent = d.speaker || ""; ui.line.textContent = d.lines[state.lineIndex] || ""; ui.choices.innerHTML = ""; if (state.lineIndex >= d.lines.length - 1 && d.choices) d.choices.forEach((c, i) => { const b = document.createElement("button"); b.textContent = c.text; b.classList.toggle("is-selected", i === state.selected); b.onclick = () => choose(c); ui.choices.appendChild(b); }); }
+function advance() { const d = currentDialogue(); if (state.lineIndex < d.lines.length - 1) { state.lineIndex++; renderDialogue(); } else if (d.choices?.length) choose(d.choices[state.selected] || d.choices[0]); else closeDialogue(); }
+function moveChoice(delta) { const d = currentDialogue(); if (!d.choices?.length || state.lineIndex < d.lines.length - 1) return; state.selected = (state.selected + delta + d.choices.length) % d.choices.length; renderDialogue(); }
+function choose(c) { if (c.done) markDone(c.done); if (c.set) Object.entries(c.set).forEach(([p, v]) => setDeep(p, v)); if (c.objective) data.objective = c.objective; if (c.effect === "fire") castFireball("fire", true); if (c.effect === "crystal") crystalEffect(); if (c.to) { state.dialogueId = c.to; state.lineIndex = 0; state.selected = 0; updateHud(); renderDialogue(); return; } if (c.targetMap) { closeDialogue(); loadMap(c.targetMap, c.spawn || initialSpawn(c.targetMap)); return; } closeDialogue(); updateHud(); }
+function markDone(ids) { ids.forEach((id) => { const q = state.quest.find((x) => x.id === id); if (q) q.done = true; }); }
+function setDeep(path, val) { const ks = path.split("."); let t = state; while (ks.length > 1) { const k = ks.shift(); t[k] ??= {}; t = t[k]; } t[ks[0]] = val; }
+function updateHud() { ui.stat.name.textContent = state.player.name; ui.stat.hp.textContent = `${state.player.hp}/${state.player.maxHp}`; ui.stat.mp.textContent = `${state.player.mp}/${state.player.maxMp}`; staminaText(); ui.stat.rank.textContent = state.player.rank; ui.stat.contract.textContent = state.player.contract; ui.objective.textContent = (state.debug ? "[DEBUG FLY] " : "") + (data.objective || "ギルドへ向かう"); ui.area.textContent = state.map === "plaza" ? "王都アウレリア城下町" : state.map === "guildHall" ? "冒険者ギルド内部" : state.map === "trainingGround" ? "外門練習場" : (data.maps?.[state.map]?.name || "王都へ続く森の街道"); ui.map.textContent = state.map === "plaza" ? "[北門]\n  |\n[市場]-[中央広場]-[職人区]\n  |      |\n[スラム]-[ギルド]-[訓練場]\n  |\n[教会]-[貴族街]-[王城]" : state.map === "guildHall" ? "[受付]-[水晶]\n   |\n[ギルドマスター]\n   |\n[出口]" : state.map === "trainingGround" ? "[入口]-[的]-[模擬戦]" : (data.maps?.[state.map]?.minimap || "[森の街道] -- [王都門]"); renderQuests(); }
+function renderQuests() { ui.quests.innerHTML = ""; state.quest.forEach((q) => { const li = document.createElement("li"); li.textContent = q.text; if (q.done) li.classList.add("done"); ui.quests.appendChild(li); }); }
+function staminaText() { ui.stat.stamina.textContent = `${Math.round(state.player.stamina)}/${state.player.maxStamina}`; }
+window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
+peek: () => ({ cam: camera.position.toArray().map((n) => +n.toFixed(1)), dir: (() => { const d = new THREE.Vector3(); camera.getWorldDirection(d); return d.toArray().map((n) => +n.toFixed(2)); })(), balls: projectiles.map((p) => { const ndc = p.ball.position.clone().project(camera); return { pos: p.ball.position.toArray().map((n) => +n.toFixed(1)), visible: p.ball.visible, inScene: !!p.ball.parent, emis: p.ball.material.emissiveIntensity, ndc: [+ndc.x.toFixed(2), +ndc.y.toFixed(2), +ndc.z.toFixed(2)] }; }) }) };
+addEventListener("keydown", (e) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault(); if (state.inDialogue) { if (e.code === "ArrowDown") { moveChoice(1); return; } if (e.code === "ArrowUp") { moveChoice(-1); return; } if (e.code === "Escape") return closeDialogue(); if (e.code === "Enter" || e.code === "Space") return advance(); } if (e.code === "KeyF") state.cameraMode = state.cameraMode === "third" ? "first" : "third"; if (e.code === "Backquote" || e.code === "F3") { state.debug = !state.debug; updateHud(); } if (e.code === "KeyE" && state.active) interact(); state.keys.add(e.code); });
+addEventListener("keyup", (e) => state.keys.delete(e.code));
+ui.canvas.addEventListener("pointerdown", (e) => { state.drag = true; state.lastX = e.clientX; state.lastY = e.clientY; });
+addEventListener("pointerup", () => state.drag = false);
+addEventListener("pointermove", (e) => { if (!state.drag || state.inDialogue) return; state.yaw -= (e.clientX - state.lastX) * .006; state.pitch = THREE.MathUtils.clamp(state.pitch - (e.clientY - state.lastY) * .004, -.55, .75); state.lastX = e.clientX; state.lastY = e.clientY; });
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio || 1, quality.pixelRatio)); });

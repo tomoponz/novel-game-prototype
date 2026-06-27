@@ -89,10 +89,26 @@
       <span>F3/`：Debug Fly</span>
     </section>
 
-    <div id="loading" class="loading">王国マップを生成中...</div>
+    <div id="loading" class="loading is-hidden">王国マップを生成中...</div>
   </main>
 
   <script src="story.js"></script>
-  <script type="module" src="game_world.js?v=aurelia-world-polish-2"></script>
+  <script>
+    (() => {
+      const rawDpr = window.devicePixelRatio || 1;
+      const renderParams = new URLSearchParams(location.search);
+      const renderMode = renderParams.get("quality") || renderParams.get("render") || "medium";
+      const cap = renderMode === "high" ? 1.5 : renderMode === "low" ? 1.0 : 1.25;
+      try {
+        Object.defineProperty(window, "devicePixelRatio", {
+          configurable: true,
+          get() { return Math.min(rawDpr, cap); }
+        });
+      } catch (error) {
+        window.__AURELIA_RENDER_CAP__ = cap;
+      }
+    })();
+  </script>
+  <script type="module" src="game_world.js?v=hilltop-megacity-performance-20260627"></script>
 </body>
 </html>

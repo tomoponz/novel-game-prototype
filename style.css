@@ -1,0 +1,180 @@
+* { box-sizing: border-box; }
+:root {
+  color-scheme: dark;
+  font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, system-ui, sans-serif;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: #f5efe7;
+  background: #06070b;
+}
+.app {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+.stage {
+  position: relative;
+  width: min(1120px, 100%);
+  min-height: min(720px, calc(100vh - 36px));
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(95, 76, 52, .34), transparent 36%),
+    linear-gradient(135deg, #141720 0%, #07080d 60%, #090506 100%);
+  box-shadow: 0 24px 80px rgba(0,0,0,.65);
+}
+.stage.bg-city-stone {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(186, 134, 74, .26), transparent 38%),
+    linear-gradient(140deg, #1a1715 0%, #161923 52%, #07080d 100%);
+}
+.stage.bg-guild-fog {
+  background:
+    radial-gradient(circle at 35% 20%, rgba(174,174,154,.20), transparent 45%),
+    linear-gradient(140deg, #11191b 0%, #161614 52%, #07080d 100%);
+}
+.stage.bg-church-night {
+  background:
+    radial-gradient(circle at 50% 22%, rgba(219,201,147,.18), transparent 30%),
+    linear-gradient(140deg, #0c0d16 0%, #111018 54%, #030305 100%);
+}
+.vignette {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 0 44%, rgba(0,0,0,.68) 100%);
+}
+.topbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 26px;
+}
+.label {
+  margin: 0 0 6px;
+  color: #d7b883;
+  font-size: 12px;
+  letter-spacing: .2em;
+}
+h1 {
+  margin: 0;
+  font-size: clamp(24px, 4vw, 44px);
+  letter-spacing: .04em;
+  text-shadow: 0 2px 14px rgba(0,0,0,.7);
+}
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: flex-start;
+}
+button {
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 999px;
+  padding: 9px 14px;
+  color: #f5efe7;
+  background: rgba(255,255,255,.08);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+button:hover, button:focus-visible {
+  background: rgba(215,184,131,.18);
+  outline: none;
+}
+.status {
+  position: relative;
+  z-index: 2;
+  margin: 6px 26px 0 auto;
+  width: min(360px, calc(100% - 52px));
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 18px;
+  background: rgba(0,0,0,.32);
+  backdrop-filter: blur(10px);
+}
+.status div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.status div:last-child { border-bottom: 0; }
+.status span {
+  color: #aeb3c3;
+  font-size: 12px;
+  letter-spacing: .16em;
+}
+.status strong {
+  text-align: right;
+  font-weight: 600;
+}
+.textbox {
+  position: absolute;
+  z-index: 3;
+  left: 26px;
+  right: 26px;
+  bottom: 26px;
+  min-height: 230px;
+  padding: 22px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 22px;
+  background: rgba(5, 7, 11, .80);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 52px rgba(0,0,0,.45);
+}
+.backlog {
+  max-height: 72px;
+  overflow: hidden;
+  color: rgba(245,239,231,.52);
+  font-size: 14px;
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+.speaker {
+  margin: 0 0 8px;
+  color: #d7b883;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+.line {
+  min-height: 4.8em;
+  margin: 0;
+  font-size: clamp(17px, 2.1vw, 21px);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+.choices {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.choices button {
+  width: 100%;
+  border-radius: 14px;
+  text-align: left;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.hint {
+  margin: 14px 0 0;
+  color: rgba(245,239,231,.42);
+  font-size: 12px;
+}
+@media (max-width: 720px) {
+  .app { padding: 0; }
+  .stage { min-height: 100vh; border-radius: 0; }
+  .topbar { padding: 18px; flex-direction: column; }
+  .status { margin: 0 18px; width: auto; }
+  .textbox { left: 12px; right: 12px; bottom: 12px; padding: 16px; }
+  .line { min-height: 7em; }
+}

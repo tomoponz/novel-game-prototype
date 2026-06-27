@@ -10,22 +10,44 @@
   <main id="app">
     <canvas id="game-canvas" aria-label="3D探索画面"></canvas>
 
-    <section class="hud" aria-label="HUD">
-      <div>
-        <p class="label">OBJECTIVE</p>
-        <h1 id="objective">ギルドの場所を探す</h1>
-      </div>
-      <div class="status">
-        <div><span>NAME</span><strong id="stat-name"></strong></div>
-        <div><span>HP</span><strong id="stat-hp"></strong></div>
-        <div><span>MP</span><strong id="stat-mp"></strong></div>
-        <div><span>RANK</span><strong id="stat-rank"></strong></div>
-        <div><span>CONTRACT</span><strong id="stat-contract"></strong></div>
+    <section id="title-screen" class="title-screen">
+      <div class="title-card">
+        <p class="label">3D EXPLORATION NOVEL RPG</p>
+        <h1>Novel RPG Prototype</h1>
+        <p class="title-copy">異世界の石畳で目覚め、ギルド登録のために街を歩く。</p>
+        <button id="start-btn" class="primary-button" type="button">Start</button>
       </div>
     </section>
 
+    <section class="hud" aria-label="HUD">
+      <div class="objective-box">
+        <p class="label">OBJECTIVE</p>
+        <h2 id="objective">ギルドの場所を探す</h2>
+        <p id="area-name" class="area-name">王都中央広場</p>
+      </div>
+
+      <div class="right-panels">
+        <div class="status">
+          <div><span>NAME</span><strong id="stat-name"></strong></div>
+          <div><span>HP</span><strong id="stat-hp"></strong></div>
+          <div><span>MP</span><strong id="stat-mp"></strong></div>
+          <div><span>RANK</span><strong id="stat-rank"></strong></div>
+          <div><span>CONTRACT</span><strong id="stat-contract"></strong></div>
+        </div>
+        <div class="quest-panel">
+          <p class="label">QUEST</p>
+          <ul id="quest-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="mini-map" aria-label="簡易マップ">
+      <p class="label">MAP</p>
+      <pre id="mini-map-text"></pre>
+    </section>
+
     <aside id="interact-hint" class="interact-hint is-hidden">
-      <kbd>E</kbd> 話す
+      <kbd>E</kbd> <span id="interact-text">話す</span>
     </aside>
 
     <section id="dialogue" class="dialogue is-hidden" aria-live="polite">
@@ -37,7 +59,7 @@
 
     <section class="help">
       <span>WASD / 矢印：移動</span>
-      <span>E：会話</span>
+      <span>E：会話・入る</span>
       <span>マウスドラッグ：視点回転</span>
     </section>
 

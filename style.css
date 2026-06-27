@@ -42,9 +42,49 @@ body {
     radial-gradient(circle at 50% 22%, rgba(219,201,147,.18), transparent 30%),
     linear-gradient(140deg, #0c0d16 0%, #111018 54%, #030305 100%);
 }
+.visuals {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.bg-image,
+.character-image {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+}
+.bg-image {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: .54;
+}
+.character-image {
+  bottom: 172px;
+  width: min(42vw, 400px);
+  max-height: min(62vh, 540px);
+  object-fit: contain;
+  filter: drop-shadow(0 18px 36px rgba(0, 0, 0, .45));
+}
+.character-image[data-position="left"] {
+  left: clamp(18px, 5vw, 56px);
+}
+.character-image[data-position="center"] {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.character-image[data-position="right"] {
+  right: clamp(18px, 5vw, 56px);
+}
+.is-hidden {
+  display: none;
+}
 .vignette {
   pointer-events: none;
   position: absolute;
+  z-index: 1;
   inset: 0;
   background: radial-gradient(circle at center, transparent 0 44%, rgba(0,0,0,.68) 100%);
 }
@@ -176,5 +216,10 @@ button:hover, button:focus-visible {
   .topbar { padding: 18px; flex-direction: column; }
   .status { margin: 0 18px; width: auto; }
   .textbox { left: 12px; right: 12px; bottom: 12px; padding: 16px; }
+  .character-image {
+    width: min(52vw, 280px);
+    max-height: 40vh;
+    bottom: 232px;
+  }
   .line { min-height: 7em; }
 }

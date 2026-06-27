@@ -20,6 +20,8 @@
     statMp: $("stat-mp"),
     statRank: $("stat-rank"),
     statContract: $("stat-contract"),
+    bgImage: $("bg-image"),
+    characterImage: $("character-image"),
   };
 
   let state = newGameState();
@@ -43,7 +45,9 @@
     let target = state;
     while (keys.length > 1) {
       const key = keys.shift();
-      if (target[key] == null || typeof target[key] !== "object") target[key] = {};
+      if (target[key] == null || typeof target[key] !== "object") {
+        target[key] = {};
+      }
       target = target[key];
     }
     target[keys[0]] = value;
@@ -77,6 +81,7 @@
   function advance() {
     const scene = currentScene();
     if (!scene) return;
+
     if (state.lineIndex < scene.lines.length - 1) {
       state.history.push(scene.lines[state.lineIndex]);
       state.history = state.history.slice(-4);
@@ -85,8 +90,36 @@
       render();
       return;
     }
+
     if (scene.choices && scene.choices.length === 1) {
       applyChoice(scene.choices[0]);
+    }
+  }
+
+  function updateVisualImage(imageElement, src, alt = "", position = "center") {
+    if (!imageElement) return;
+
+    if (!src) {
+      imageElement.removeAttribute("src");
+      imageElement.alt = "";
+      imageElement.classList.add("is-hidden");
+      return;
+    }
+
+    imageElement.dataset.position = position;
+    imageElement.alt = alt;
+    imageElement.onerror = () => {
+      imageElement.classList.add("is-hidden");
+    };
+    imageElement.onload = () => {
+      imageElement.classList.remove("is-hidden");
+    };
+
+    if (imageElement.getAttribute("src") !== src) {
+      imageElement.classList.add("is-hidden");
+      imageElement.src = src;
+    } else {
+      imageElement.classList.remove("is-hidden");
     }
   }
 
@@ -99,6 +132,14 @@
     elements.speaker.textContent = scene.speaker || "";
     elements.line.textContent = scene.lines[state.lineIndex] || "";
     elements.backlog.innerHTML = state.history.map(escapeHtml).join("<br>");
+
+    updateVisualImage(elements.bgImage, scene.bgImage, `${scene.title || story.title} の背景`);
+    updateVisualImage(
+      elements.characterImage,
+      scene.characterImage,
+      scene.characterAlt || scene.speaker || "立ち絵",
+      scene.characterPosition || "center"
+    );
 
     const atEnd = state.lineIndex >= scene.lines.length - 1;
     elements.choices.innerHTML = "";
@@ -142,6 +183,7 @@
       toast("セーブデータがありません");
       return;
     }
+
     try {
       state = JSON.parse(saved);
       toast("ロードしました");
@@ -160,10 +202,8 @@
   }
 
   function toast(message) {
-    elements.line.dataset.toast = message;
     const old = elements.line.textContent;
-    elements.line.textContent = `【${message}】
-${old}`;
+    elements.line.textContent = `【${message}】\n${old}`;
     window.setTimeout(() => render(), 650);
   }
 
@@ -171,6 +211,7 @@ ${old}`;
     if (event.target.closest("button")) return;
     advance();
   });
+
   document.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -178,9 +219,19 @@ ${old}`;
     }
     if (event.key === "Escape") save();
   });
-  elements.save.addEventListener("click", (event) => { event.stopPropagation(); save(); });
-  elements.load.addEventListener("click", (event) => { event.stopPropagation(); load(); });
-  elements.reset.addEventListener("click", (event) => { event.stopPropagation(); reset(); });
+
+  elements.save.addEventListener("click", (event) => {
+    event.stopPropagation();
+    save();
+  });
+  elements.load.addEventListener("click", (event) => {
+    event.stopPropagation();
+    load();
+  });
+  elements.reset.addEventListener("click", (event) => {
+    event.stopPropagation();
+    reset();
+  });
 
   render();
 })();

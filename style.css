@@ -177,6 +177,16 @@ button {
   cursor: pointer;
 }
 button:hover, button:focus-visible { background: rgba(216,179,107,.18); outline: none; }
+.choices button.is-selected {
+  border-color: rgba(216,179,107,.88);
+  background: rgba(216,179,107,.25);
+  box-shadow: 0 0 0 2px rgba(216,179,107,.18), 0 10px 26px rgba(0,0,0,.25);
+}
+.choices button.is-selected::before {
+  content: "▶ ";
+  color: var(--gold);
+  font-weight: 900;
+}
 .hint { margin: 12px 0 0; color: rgba(246,239,225,.45); font-size: 12px; }
 .help {
   position: fixed;

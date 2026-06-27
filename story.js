@@ -23,9 +23,9 @@ window.GAME_DATA = {
       name: "王都中央広場",
       minimap: "      [教会]\n         |\n[宿屋]-[広場]-[市場]\n         |\n      [ギルド]",
       npcs: [
-        { id: "traveler", name: "通行人", position: { x: -3.8, z: 2.2 }, color: 0x7f9fbd, dialogue: "traveler_start" },
-        { id: "guard", name: "護衛隊員", position: { x: 4.2, z: 1.1 }, color: 0xb77954, dialogue: "guard_start" },
-        { id: "guild_guide", name: "ギルド案内係", position: { x: -1.8, z: -8.2 }, color: 0xd8b36b, dialogue: "guild_guide_start" }
+        { id: "traveler", variant: "traveler", name: "通行人", position: { x: -3.8, z: 2.2 }, color: 0x7f9fbd, dialogue: "traveler_start" },
+        { id: "guard", variant: "guard", name: "護衛隊員", position: { x: 4.2, z: 1.1 }, color: 0xb77954, dialogue: "guard_start" },
+        { id: "guild_guide", variant: "guild_guide", name: "ギルド案内係", position: { x: -1.8, z: -8.2 }, color: 0xd8b36b, dialogue: "guild_guide_start" }
       ],
       locations: [
         { id: "guild_door", name: "冒険者ギルドに入る", position: { x: 0, z: -9.6 }, targetMap: "guildHall", spawn: { x: 0, z: 6.4 }, radius: 2.4 },
@@ -36,8 +36,8 @@ window.GAME_DATA = {
       name: "冒険者ギルド・受付ホール",
       minimap: "[掲示板]  [受付]\n\n  [テーブル]\n\n      [出口]",
       npcs: [
-        { id: "receptionist", name: "ギルド受付", position: { x: 0, z: -3.4 }, color: 0xd8b36b, dialogue: "reception_start" },
-        { id: "veteran", name: "古参冒険者", position: { x: -3.8, z: .9 }, color: 0x8c6f4f, dialogue: "veteran_start" }
+        { id: "receptionist", variant: "receptionist", name: "ギルド受付", position: { x: 0, z: -3.4 }, color: 0xd8b36b, dialogue: "reception_start" },
+        { id: "veteran", variant: "veteran", name: "古参冒険者", position: { x: -3.8, z: .9 }, color: 0x8c6f4f, dialogue: "veteran_start" }
       ],
       locations: [
         { id: "guild_exit", name: "広場へ戻る", position: { x: 0, z: 7.0 }, targetMap: "plaza", spawn: { x: 0, z: -7.2 }, radius: 1.9 },
@@ -48,7 +48,7 @@ window.GAME_DATA = {
       name: "教会・祈祷室",
       minimap: "   [祭壇]\n\n [司祭]\n\n   [出口]",
       npcs: [
-        { id: "priest", name: "司祭", position: { x: 0, z: -2.5 }, color: 0xc9c4ad, dialogue: "priest_start" }
+        { id: "priest", variant: "priest", name: "司祭", position: { x: 0, z: -2.5 }, color: 0xc9c4ad, dialogue: "priest_start" }
       ],
       locations: [
         { id: "church_exit", name: "広場へ戻る", position: { x: 0, z: 6.3 }, targetMap: "plaza", spawn: { x: -10.5, z: -2.2 }, radius: 2.0 }

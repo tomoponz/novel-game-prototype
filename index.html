@@ -56,6 +56,14 @@
         <span>△ BURST</span>
         <meter id="burst-cooldown" min="0" max="1" value="1"></meter>
       </div>
+      <label class="quality-row">
+        <span>QUALITY</span>
+        <select id="quality-select" aria-label="画質設定">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+      </label>
     </section>
 
     <aside id="interact-hint" class="interact-hint is-hidden">
@@ -85,6 +93,6 @@
   </main>
 
   <script src="story.js"></script>
-  <script type="module" src="game_world.js?v=aurelia-world-polish"></script>
+  <script type="module" src="game_world.js?v=aurelia-world-polish-2"></script>
 </body>
 </html>

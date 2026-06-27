@@ -30,6 +30,9 @@
 - 会話選択肢をDualShock 4で上下選択して決定
 - 入口・掲示板などに発光マーカーを配置
 - 会話の選択肢でステータス・目的・クエスト進行を変化
+- Low / Medium / High の画質設定
+- Mediumを標準にしたpixelRatio制限、距離カリング、距離別NPC/馬車更新、spatial grid当たり判定
+- 木、岩、木箱、樽などの小物をInstancedMesh化して描画負荷を軽減
 
 ## 操作
 
@@ -52,6 +55,18 @@
 | Esc | 会話を閉じる |
 
 開発確認用に `?map=plaza`、`?map=guildHall`、`?map=church`、`?map=trainingGround` を付けると各マップから直接開始できます。`?debug=1` を併用すると内部確認用APIも有効になります。
+
+### 画質設定
+
+画面右下の `QUALITY` から `Low`、`Medium`、`High` を切り替えられます。標準は `Medium` です。
+
+| 設定 | 内容 |
+|---|---|
+| Low | pixelRatioを1.0に抑え、遠距離の小物・NPC・馬車の表示/更新距離を短くする |
+| Medium | pixelRatio上限1.35。近景品質と王都の密度を維持しつつ、遠距離小物と更新処理を抑える |
+| High | pixelRatio上限1.5。表示距離を広げ、見た目優先で確認する |
+
+王城、ギルド、教会、プレイヤー、主要NPC、馬車は影を優先し、遠距離の小物や大量の木箱・樽・岩・木は影や個別メッシュを抑えています。当たり判定はspatial gridで近くのcolliderだけを見るようにしています。
 
 ### DualShock 4
 

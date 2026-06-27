@@ -7,11 +7,20 @@ const ui = {
   hint: $("interact-hint"), hintText: $("interact-text"), dialog: $("dialogue"), speaker: $("speaker"), line: $("line"), choices: $("choices"),
   objective: $("objective"), area: $("area-name"), map: $("mini-map-text"), quests: $("quest-list"),
   stat: { name: $("stat-name"), hp: $("stat-hp"), mp: $("stat-mp"), stamina: $("stat-stamina"), rank: $("stat-rank"), contract: $("stat-contract") },
-  cooldowns: { fire: $("fire-cooldown"), burst: $("burst-cooldown") }
+  cooldowns: { fire: $("fire-cooldown"), burst: $("burst-cooldown") },
+  quality: $("quality-select")
 };
 
 const bootParams = new URLSearchParams(location.search);
 const debugStartMap = data.maps?.[bootParams.get("map")] ? bootParams.get("map") : null;
+const QUALITY_PROFILES = {
+  low: { pixelRatio: 1.0, shadows: false, cull: { prop: 52, building: 120, npc: 58, cart: 95 }, animate: { ped: 62, cart: 105 } },
+  medium: { pixelRatio: 1.35, shadows: true, cull: { prop: 82, building: 185, npc: 95, cart: 145 }, animate: { ped: 95, cart: 150 } },
+  high: { pixelRatio: 1.5, shadows: true, cull: { prop: 125, building: 250, npc: 145, cart: 210 }, animate: { ped: 145, cart: 220 } }
+};
+const qualityParam = bootParams.get("quality") || bootParams.get("render") || "medium";
+const initialQuality = QUALITY_PROFILES[qualityParam] ? qualityParam : "medium";
+let activeQuality = QUALITY_PROFILES[initialQuality];
 
 const extraDialogues = {
   wake_after: { speaker: "ユウジ", lines: ["白い輪郭はまだ視界の端に残っている。これは幻覚ではなく、この世界の仕組みだ。", "同じ場所で悩むより、街道の先にある荷車と王都門を確認する。"] },
@@ -38,14 +47,14 @@ const state = {
   inDialogue: false, dialogueId: null, dialogueLine: 0, selectedChoice: 0, choiceCooldown: 0,
   padButtons: [], isDashing: false, dodgeTimer: 0, castCooldown: 0, castMaxCooldown: .28,
   fireCooldown: 0, burstCooldown: 0, fireMaxCooldown: .32, burstMaxCooldown: .95,
-  cameraShake: 0, hitStop: 0, magicPulse: 0
+  cameraShake: 0, hitStop: 0, magicPulse: 0, quality: initialQuality
 };
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, .1, 950);
 const renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: true });
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, activeQuality.pixelRatio));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -65,9 +74,17 @@ let bounds = { minX: -85, maxX: 85, minZ: -125, maxZ: 125 };
 let caravan = null;
 let beast = null;
 let merchant = null;
+let sunLight = null;
+let colliderGrid = new Map();
+let cullTimer = 0;
 const projectiles = [];
 const bursts = [];
 const tempLights = [];
+const cullables = [];
+const instanceQueues = new Map();
+const GRID_SIZE = 12;
+const INSTANCE_BUCKET_SIZE = 70;
+const PRIMARY_SHADOW_LABELS = new Set(["castle","castleKeep","castleTower","guildDoor","churchStone","buttress","caravan"]);
 
 initLights();
 loadMap(state.map, initialSpawn(state.map));
@@ -81,7 +98,7 @@ function exposeDebugApi(){
   window.__AURELIA_DEBUG__ = {
     state, player, loadMap, tryMove, castFireball, toggleCamera, colliderAt,
     setPlayer(x,z){ player.position.set(x,0,z); },
-    counts(){ return { map:state.map, colliders:colliders.length, movers:movers.length, npcs:npcs.length, locations:locations.length, projectiles:projectiles.length }; },
+    counts(){ return { map:state.map, quality:state.quality, colliders:colliders.length, gridCells:colliderGrid.size, movers:movers.length, npcs:npcs.length, cullables:cullables.length, locations:locations.length, projectiles:projectiles.length }; },
     sampleMovers(){ return movers.slice(0,5).map(m=>({ type:m.type, x:+m.object.position.x.toFixed(2), z:+m.object.position.z.toFixed(2) })); },
     locations(){ return locations.map(l=>({ id:l.id, targetMap:l.targetMap || null, x:l.position.x, z:l.position.z })); }
   };
@@ -93,21 +110,34 @@ function initialSpawn(id){
 function initLights(){
   scene.add(new THREE.HemisphereLight(0xf7eddb, 0x28364a, 2.75));
   const sun = new THREE.DirectionalLight(0xfff0ce, 3.2);
+  sunLight = sun;
   sun.position.set(40,70,30);
-  sun.castShadow = true;
+  sun.castShadow = activeQuality.shadows;
   sun.shadow.mapSize.set(2048,2048);
   Object.assign(sun.shadow.camera,{ near:.5, far:260, left:-135, right:135, top:135, bottom:-135 });
   scene.add(sun);
+  applyQuality(state.quality, false);
 }
 function mat(color, rough=.82, em=0x000000, power=0){
   return new THREE.MeshStandardMaterial({ color, roughness: rough, emissive: em, emissiveIntensity: power, flatShading: true });
 }
 function add(geo, material, parent=world, cast=true, receive=true){
   const m = new THREE.Mesh(geo, material);
-  m.castShadow = cast;
+  m.castShadow = Boolean(cast && activeQuality.shadows && parent?.userData?.shadowPriority);
   m.receiveShadow = receive;
   parent.add(m);
   return m;
+}
+function shouldCastShadow(label="", parent=world, preferred=true){
+  return Boolean(preferred && activeQuality.shadows && (parent?.userData?.shadowPriority || PRIMARY_SHADOW_LABELS.has(label)));
+}
+function setModelShadow(root, enabled){
+  root.traverse?.(o => {
+    if(o.isMesh){
+      o.castShadow = Boolean(enabled && activeQuality.shadows);
+      o.receiveShadow = true;
+    }
+  });
 }
 function rand(a,b){ return a + Math.random() * (b-a); }
 function pick(arr){ return arr[Math.floor(rand(0,arr.length))]; }
@@ -118,10 +148,12 @@ function loadMap(id, spawn){
   world.clear();
   npcs.forEach(n => scene.remove(n));
   npcs = []; locations = []; colliders = []; movers = [];
+  colliderGrid = new Map(); cullables.length = 0; instanceQueues.clear(); cullTimer = 0;
   caravan = beast = merchant = null;
   projectiles.length = 0; bursts.length = 0; tempLights.length = 0;
 
   ({ forestRoad: buildForestRoad, plaza: buildKingdom, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround }[id] || buildKingdom)();
+  flushInstancedProps();
 
   const md = data.maps[id];
   locations = (md.locations || []).map(l => ({ ...l, kind: l.targetMap ? "door" : "spot" }));
@@ -135,12 +167,40 @@ function loadMap(id, spawn){
   (md.npcs || []).forEach(addNpc);
 
   player.position.set(spawn.x, spawn.y || 0, spawn.z);
+  updateCulling(true);
   updateHud();
 }
 function env(color, near, far){ scene.background = new THREE.Color(color); scene.fog = new THREE.Fog(color, near, far); }
-function addCollider(x,z,w,d,label=""){ colliders.push({ x, z, w, d, label }); }
+function gridKey(cx,cz){ return `${cx},${cz}`; }
+function addCollider(x,z,w,d,label=""){
+  const c = { x, z, w, d, label };
+  colliders.push(c);
+  const minX=Math.floor((x-w/2)/GRID_SIZE), maxX=Math.floor((x+w/2)/GRID_SIZE);
+  const minZ=Math.floor((z-d/2)/GRID_SIZE), maxZ=Math.floor((z+d/2)/GRID_SIZE);
+  for(let gx=minX; gx<=maxX; gx++){
+    for(let gz=minZ; gz<=maxZ; gz++){
+      const key=gridKey(gx,gz);
+      if(!colliderGrid.has(key)) colliderGrid.set(key, []);
+      colliderGrid.get(key).push(c);
+    }
+  }
+  return c;
+}
+function nearbyColliders(x,z,r){
+  const minX=Math.floor((x-r)/GRID_SIZE), maxX=Math.floor((x+r)/GRID_SIZE);
+  const minZ=Math.floor((z-r)/GRID_SIZE), maxZ=Math.floor((z+r)/GRID_SIZE);
+  const seen=new Set(), out=[];
+  for(let gx=minX; gx<=maxX; gx++){
+    for(let gz=minZ; gz<=maxZ; gz++){
+      const cell=colliderGrid.get(gridKey(gx,gz));
+      if(!cell) continue;
+      for(const c of cell){ if(!seen.has(c)){ seen.add(c); out.push(c); } }
+    }
+  }
+  return out;
+}
 function colliderAt(x,z,r=.58, dynamic=true){
-  for(const c of colliders){
+  for(const c of nearbyColliders(x,z,r)){
     if(x > c.x - c.w/2 - r && x < c.x + c.w/2 + r && z > c.z - c.d/2 - r && z < c.z + c.d/2 + r) return c;
   }
   if(dynamic){
@@ -160,12 +220,14 @@ function isBlocked(x,z,r=.58){ return Boolean(colliderAt(x,z,r,true)); }
 function placeBox(x,y,z,w,h,d,color,label="",parent=world){
   const m = add(new THREE.BoxGeometry(w,h,d), mat(color), parent);
   m.position.set(x,y,z);
+  m.castShadow = shouldCastShadow(label,parent,true);
   if(parent === world && label) addCollider(x,z,w,d,label);
   return m;
 }
 function placeCylinder(x,y,z,r,h,color,label="",parent=world){
   const m = add(new THREE.CylinderGeometry(r,r,h,12), mat(color), parent);
   m.position.set(x,y,z);
+  m.castShadow = shouldCastShadow(label,parent,true);
   if(parent === world && label) addCollider(x,z,r*2,r*2,label);
   return m;
 }
@@ -178,6 +240,60 @@ function addRoad(x,z,w,d,color=0x6f6657){
   const r = placeBox(x,.03,z,w,.04,d,color);
   r.receiveShadow = true;
   return r;
+}
+function registerCullable(object, type="prop", x=object.position.x, z=object.position.z, multiplier=1){
+  object.userData.cullType = type;
+  cullables.push({ object, type, x, z, multiplier });
+  return object;
+}
+function updateCulling(force=false, dt=.22){
+  if(!force && (cullTimer-=dt)>0) return;
+  cullTimer = .22;
+  const px=player.position.x, pz=player.position.z;
+  for(const item of cullables){
+    const range=(activeQuality.cull[item.type] || activeQuality.cull.prop) * item.multiplier;
+    item.object.visible = state.debug || Math.hypot(px-item.x,pz-item.z) <= range;
+  }
+  for(const n of npcs){
+    const range=activeQuality.cull.npc;
+    n.visible = state.debug || Math.hypot(px-n.position.x,pz-n.position.z) <= range;
+  }
+  for(const m of movers){
+    const range=m.type==="cart" ? activeQuality.cull.cart : activeQuality.cull.npc;
+    m.object.visible = state.debug || Math.hypot(px-m.object.position.x,pz-m.object.position.z) <= range;
+  }
+}
+function instanceKey(kind,color,x,z){
+  return `${kind}:${color}:${Math.floor(x/INSTANCE_BUCKET_SIZE)}:${Math.floor(z/INSTANCE_BUCKET_SIZE)}`;
+}
+function instanceGeometry(kind){
+  if(kind==="box") return new THREE.BoxGeometry(1,1,1);
+  if(kind==="cylinder") return new THREE.CylinderGeometry(1,1,1,8);
+  return new THREE.DodecahedronGeometry(1,0);
+}
+function queueInstance(kind,color,x,y,z,sx,sy,sz,type="prop"){
+  const key=instanceKey(kind,color,x,z);
+  if(!instanceQueues.has(key)) instanceQueues.set(key,{ kind, color, type, matrices:[], x:0, z:0 });
+  const q=instanceQueues.get(key);
+  const matrix=new THREE.Matrix4();
+  matrix.compose(new THREE.Vector3(x,y,z), new THREE.Quaternion(), new THREE.Vector3(sx,sy,sz));
+  q.matrices.push(matrix); q.x+=x; q.z+=z;
+}
+function flushInstancedProps(){
+  for(const q of instanceQueues.values()){
+    const mesh=new THREE.InstancedMesh(instanceGeometry(q.kind), mat(q.color,.9), q.matrices.length);
+    q.matrices.forEach((m,i)=>mesh.setMatrixAt(i,m));
+    mesh.instanceMatrix.needsUpdate=true;
+    mesh.castShadow=false;
+    mesh.receiveShadow=true;
+    world.add(mesh);
+    registerCullable(mesh,q.type,q.x/q.matrices.length,q.z/q.matrices.length,1.15);
+  }
+  instanceQueues.clear();
+}
+function addRock(x,z,s=.55){
+  queueInstance("rock",0x6b6b62,x,.16,z,s,s*rand(.45,.9),s,"prop");
+  addCollider(x,z,.8*s,.8*s,"rock");
 }
 
 function buildForestRoad(){
@@ -197,10 +313,7 @@ function buildForestRoad(){
     addTree(x,z,rand(.8,1.5), true);
   }
   for(let i=0;i<90;i++){
-    const rock = add(new THREE.DodecahedronGeometry(rand(.25,.75),0), mat(0x6b6b62,.95));
-    rock.position.set(rand(-80,80), .16, rand(-120,120));
-    rock.scale.y = rand(.45,.9);
-    addCollider(rock.position.x, rock.position.z, .8, .8, "rock");
+    addRock(rand(-80,80),rand(-120,120),rand(.35,.8));
   }
   addGateModel(0,-112);
   addCaravanScene(6, 15);
@@ -321,11 +434,12 @@ function addCastle(x,z){
   placeBox(x,10,z-12,28,8,12,0x96958e,"castleKeep");
   for(const sx of [-19,19]){
     placeBox(x+sx,11,z,8,16,8,0x7e7d76,"castleTower");
-    const roof=add(new THREE.ConeGeometry(6,8,4),mat(0x394456)); roof.position.set(x+sx,23,z); roof.rotation.y=Math.PI/4;
+    const roof=add(new THREE.ConeGeometry(6,8,4),mat(0x394456)); roof.position.set(x+sx,23,z); roof.rotation.y=Math.PI/4; roof.castShadow=activeQuality.shadows;
   }
 }
 function addMedievalHouse(x,z,w,d,h,color, signText=null){
   const g = new THREE.Group(); g.position.set(x,0,z); g.rotation.y = rand(-.035,.035); world.add(g);
+  g.userData.shadowPriority = signText === "GUILD" || signText === "CHURCH";
   const upper = Math.max(0, h-2.3);
   placeBox(0,1.05,0,w*.94,2.1,d*.94,0x76614a,"",g);
   placeBox(0,2.15+upper/2,0,w,upper,d,color,"",g);
@@ -354,6 +468,8 @@ function addMedievalHouse(x,z,w,d,h,color, signText=null){
   }
   if(Math.random()<.58) placeBox(-w*.34,h+1.35,-d*.2,.46,1.75,.46,0x50453b,"",g);
   addCollider(x,z,w,d,"house");
+  registerCullable(g,"building",x,z,signText ? 1.8 : 1);
+  return g;
 }
 function addGuildExterior(x,z){
   addMedievalHouse(x,z,16,12,7.5,0x6a5036,"GUILD");
@@ -368,7 +484,7 @@ function addGuildExterior(x,z){
 function addChurchExterior(x,z){
   addMedievalHouse(x,z,15,12,9,0x7c7a76,"CHURCH");
   placeBox(x,4.8,z-1,8,8,13,0x777873,"churchStone");
-  const sp=add(new THREE.ConeGeometry(3,11,4),mat(0x2f3541)); sp.position.set(x,16,z); sp.rotation.y=Math.PI/4;
+  const sp=add(new THREE.ConeGeometry(3,11,4),mat(0x2f3541)); sp.position.set(x,16,z); sp.rotation.y=Math.PI/4; sp.castShadow=activeQuality.shadows;
   for(const sx of [-6.8,6.8]){ placeBox(x+sx,3.2,z,1.1,6.2,2.1,0x5f625f,"buttress"); }
   for(const sx of [-2.6,0,2.6]){ placeBox(x+sx,4.2,z+6.25,1.1,2.3,.12,0x547d9a,"",world); }
   placeBox(x,10.8,z+6.35,.32,2.7,.18,0xd8d1bc,"",world);
@@ -392,6 +508,7 @@ function addMarketBlock(x,z){
     }
     if(i%5===0){ const label=createLabel(pick(["BREAD","MEAT","SPICE","CLOTH","POTION"])); label.scale.set(.9,.23,1); label.position.set(0,1.9,.95); g.add(label); }
     addCollider(px,pz,3.15,1.9,"stall");
+    registerCullable(g,"prop",px,pz,1.2);
   }
 }
 function addShopRow(){
@@ -471,20 +588,25 @@ function addStreetDetails(){
   }
 }
 function addTree(x,z,s=1,solid=false){
-  const g=new THREE.Group(); g.position.set(x,0,z); world.add(g);
-  placeCylinder(0,.75*s,0,.18*s,1.5*s,0x5b3a24,"",g);
-  const l1=add(new THREE.DodecahedronGeometry(1*s,0),mat(0x2f6f45),g); l1.position.y=1.8*s;
-  const l2=add(new THREE.DodecahedronGeometry(.65*s,0),mat(0x3d8a59),g); l2.position.set(.35*s,2.35*s,-.12*s);
+  queueInstance("cylinder",0x5b3a24,x,.75*s,z,.18*s,1.5*s,.18*s,"prop");
+  queueInstance("rock",0x2f6f45,x,1.8*s,z,s,s,s,"prop");
+  queueInstance("rock",0x3d8a59,x+.35*s,2.35*s,z-.12*s,.65*s,.65*s,.65*s,"prop");
   if(solid) addCollider(x,z,.9*s,.9*s,"tree");
 }
 function addCrateStack(x,z,n){
-  for(let i=0;i<n;i++) placeBox(x+(i%2)*.75,.35+Math.floor(i/2)*.38,z+Math.floor(i/2)*.75,.7,.7,.7,0x735334,"crate");
+  for(let i=0;i<n;i++) queueInstance("box",0x735334,x+(i%2)*.75,.35+Math.floor(i/2)*.38,z+Math.floor(i/2)*.75,.7,.7,.7,"prop");
+  addCollider(x+.38,z+.38,1.55,1.55,"crateStack");
 }
 function addBarrel(x,z,parent=world){
+  if(parent===world){
+    queueInstance("cylinder",0x6a4328,x,.38,z,.38,.74,.38,"prop");
+    queueInstance("box",0x352317,x,.72,z,.82,.08,.82,"prop");
+    addCollider(x,z,.8,.8,"barrel");
+    return null;
+  }
   const b=add(new THREE.CylinderGeometry(.36,.4,.74,10),mat(0x6a4328),parent);
   b.position.set(parent===world?x:0,.38,parent===world?z:0);
   placeBox(parent===world?x:0,.72,parent===world?z:0,.82,.08,.82,0x352317,"",parent);
-  if(parent===world) addCollider(x,z,.8,.8,"barrel");
   return b;
 }
 function addSack(x,y,z,parent=world){
@@ -558,6 +680,7 @@ function addPedestrians(){
     const path = structuredClone(pick(paths));
     const start = path[0];
     p.position.set(start[0]+rand(-2,2),0,start[1]+rand(-2,2));
+    p.userData.isMover = true;
     scene.add(p);
     movers.push({ type:"ped", object:p, path, index:1, speed:rand(1.2,2.3), wait:rand(0,1), radius:.68 });
   }
@@ -566,6 +689,7 @@ function addWanderingGuards(){
   for(let i=0;i<4;i++){
     const g=createPerson({variant:"guard",color:0xb77954});
     g.position.set(rand(-6,6),0,rand(-70,55));
+    g.userData.isMover = true;
     scene.add(g);
     movers.push({ type:"ped", object:g, path:[[rand(-5,5),rand(60,80)],[rand(-5,5),rand(15,20)],[rand(-5,5),rand(-90,-70)]], index:1, speed:1.7, wait:0, radius:.72 });
   }
@@ -587,6 +711,7 @@ function addTrafficCarts(){
 }
 function createMovingCart(){
   const g=new THREE.Group();
+  g.userData.shadowPriority = true;
   placeBox(0,.52,0,2.9,.65,1.65,0x70482c,"",g);
   placeBox(0,.98,0,2.65,.18,1.45,0x8a5d38,"",g);
   placeBox(-1.48,.85,0,.16,.75,1.7,0x3b2a1d,"",g);
@@ -604,6 +729,8 @@ function createMovingCart(){
 }
 function updateMovers(dt){
   for(const m of movers){
+    const updateRange=m.type==="cart" ? activeQuality.animate.cart : activeQuality.animate.ped;
+    if(!state.debug && Math.hypot(player.position.x-m.object.position.x,player.position.z-m.object.position.z)>updateRange) continue;
     if(m.wait>0){ m.wait-=dt; continue; }
     const target=m.path[m.index];
     if(!target) continue;
@@ -643,6 +770,7 @@ function resolveDynamicContacts(){
 
 function addCaravanScene(x,z){
   const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=-.22; world.add(g); caravan=g;
+  g.userData.shadowPriority = true;
   const cart=placeBox(0,.55,0,2.7,.65,1.55,0x6a4328,"",g); cart.rotation.z=questDone("merchant")?.05:-.18;
   placeBox(0,.95,0,2.55,.16,1.35,0x8a5d38,"",g);
   const axle=add(new THREE.CylinderGeometry(.08,.08,3.15,10),mat(0x3b2a1d),g); axle.rotation.z=Math.PI/2; axle.position.set(0,.32,0);
@@ -660,6 +788,7 @@ function addCaravanScene(x,z){
 }
 function createHorse(){
   const g=new THREE.Group();
+  g.userData.shadowPriority = true;
   placeBox(0,.78,0,1.2,.56,.42,0x5b3a28,"",g);
   const neck=placeBox(.52,1.06,0,.26,.58,.24,0x5b3a28,"",g); neck.rotation.z=-.35;
   placeBox(.78,1.28,0,.38,.28,.28,0x5b3a28,"",g);
@@ -788,6 +917,7 @@ function personProfile(v, base){
 }
 function createPerson(n){
   const g=new THREE.Group(), v=n.variant||n.id, p=personProfile(v,n.color), skin=0xd8ad84;
+  g.userData.shadowPriority = ["player","guard","receptionist","priest","merchant","adventurer","veteran","blacksmith","shady"].includes(v);
   body(g,p.cloth,p);
   head(g,skin,p.hair,p.style);
   limbs(g,p.cloth,p.leg,p.boots,skin);
@@ -843,7 +973,8 @@ function loop(){
   const dt=state.hitStop>0?0:rawDt;
   state.hitStop=Math.max(0,state.hitStop-rawDt);
   viewKeys(dt); gamepad(dt); move(dt); updateMovers(dt); updateEffects(dt,t);
-  npcs.forEach((n,i)=>{ if(!movers.some(m=>m.object===n)){ n.position.y=Math.sin(t*1.6+i*.8)*.02; n.rotation.y=Math.sin(t*.6+i)*.12; } });
+  updateCulling(false,rawDt);
+  npcs.forEach((n,i)=>{ if(n.visible!==false && !n.userData.isMover && Math.hypot(player.position.x-n.position.x,player.position.z-n.position.z)<activeQuality.animate.ped){ n.position.y=Math.sin(t*1.6+i*.8)*.02; n.rotation.y=Math.sin(t*.6+i)*.12; } });
   detect(); cameraUpdate(); renderer.render(scene,camera); requestAnimationFrame(loop);
 }
 function viewKeys(dt){
@@ -893,7 +1024,7 @@ function move(dt){
   x/=Math.max(1,len); y/=Math.max(1,len);
 
   state.isDashing=(state.keys.has("ShiftLeft")||state.keys.has("ShiftRight")||s.dash)&&state.player.stamina>2;
-  const speed=state.debug?(state.isDashing?72:32):(state.isDashing?8.2:4.6);
+  const speed=state.debug?(state.isDashing?72:32):(state.isDashing?19.0:10.0);
   if(!state.debug) state.isDashing?state.player.stamina=Math.max(0,state.player.stamina-30*dt):regen(dt,18);
 
   const rx=Math.cos(state.yaw), rz=-Math.sin(state.yaw), fx=-Math.sin(state.yaw), fz=-Math.cos(state.yaw);
@@ -914,7 +1045,7 @@ function regen(dt,a){ state.player.stamina=Math.min(state.player.maxStamina,stat
 function staminaText(){ if(ui.stat.stamina) ui.stat.stamina.textContent=`${Math.round(state.player.stamina)}/${state.player.maxStamina}`; }
 function detect(){
   let near=null,dist=Infinity;
-  npcs.forEach(n=>{const d=player.position.distanceTo(n.position); if(d<dist){dist=d;near=n.userData;}});
+  npcs.forEach(n=>{ if(n.visible===false) return; const d=player.position.distanceTo(n.position); if(d<dist){dist=d;near=n.userData;}});
   locations.forEach(l=>{const d=Math.hypot(player.position.x-l.position.x,player.position.z-l.position.z); if(d<dist){dist=d;near=l;}});
   const r=near?.radius??2.4;
   if(near&&dist<r&&!state.inDialogue&&state.started){state.activeTarget=near;ui.hintText.textContent=near.kind==="npc"?"話す":near.name;ui.hint.classList.remove("is-hidden");}
@@ -944,6 +1075,18 @@ function applyCameraShake(){
 }
 function toggleCamera(){ state.cameraMode=state.cameraMode==="third"?"first":"third"; }
 function toggleDebug(){ state.debug=!state.debug; updateHud(); }
+function applyQuality(id=state.quality, persist=true){
+  if(!QUALITY_PROFILES[id]) id="medium";
+  state.quality=id;
+  activeQuality=QUALITY_PROFILES[id];
+  renderer.setPixelRatio(Math.min(devicePixelRatio, activeQuality.pixelRatio));
+  renderer.shadowMap.enabled=activeQuality.shadows;
+  renderer.shadowMap.needsUpdate=true;
+  if(sunLight) sunLight.castShadow=activeQuality.shadows;
+  if(ui.quality) ui.quality.value=id;
+  if(persist) localStorage.setItem("aureliaQuality",id);
+  updateCulling(true);
+}
 
 function getDialogueId(t){
   if(t.id==="wake_point"&&questDone("wake"))return"wake_after";
@@ -1004,6 +1147,10 @@ function createLabel(text){
 function round(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 
 ui.start.onclick=()=>{ state.started=true; ui.title.classList.add("is-hidden"); };
+if(ui.quality){
+  ui.quality.value=state.quality;
+  ui.quality.onchange=()=>applyQuality(ui.quality.value);
+}
 addEventListener("keydown",e=>{
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault();
   if(e.code==="Backquote"||e.code==="F3"){ e.preventDefault(); return toggleDebug(); }

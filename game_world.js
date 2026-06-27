@@ -6,8 +6,12 @@ const ui = {
   canvas: $("game-canvas"), loading: $("loading"), title: $("title-screen"), start: $("start-btn"),
   hint: $("interact-hint"), hintText: $("interact-text"), dialog: $("dialogue"), speaker: $("speaker"), line: $("line"), choices: $("choices"),
   objective: $("objective"), area: $("area-name"), map: $("mini-map-text"), quests: $("quest-list"),
-  stat: { name: $("stat-name"), hp: $("stat-hp"), mp: $("stat-mp"), stamina: $("stat-stamina"), rank: $("stat-rank"), contract: $("stat-contract") }
+  stat: { name: $("stat-name"), hp: $("stat-hp"), mp: $("stat-mp"), stamina: $("stat-stamina"), rank: $("stat-rank"), contract: $("stat-contract") },
+  cooldowns: { fire: $("fire-cooldown"), burst: $("burst-cooldown") }
 };
+
+const bootParams = new URLSearchParams(location.search);
+const debugStartMap = data.maps?.[bootParams.get("map")] ? bootParams.get("map") : null;
 
 const extraDialogues = {
   wake_after: { speaker: "ユウジ", lines: ["白い輪郭はまだ視界の端に残っている。これは幻覚ではなく、この世界の仕組みだ。", "同じ場所で悩むより、街道の先にある荷車と王都門を確認する。"] },
@@ -16,16 +20,25 @@ const extraDialogues = {
   shady_alley: { speaker: "路地裏の男", lines: ["よそ者だな。北門から来た顔をしている。", "この路地では、金より身元の方が高く売れる。用がないなら表通りへ戻れ。"], choices: [{ text: "表通りへ戻る", objective: "ギルドへ向かう" }] },
   fountain_hint: { speaker: "広場の噴水", lines: ["水面に王城とギルドの旗が映っている。大通りは人と馬車で埋まっている。", "王都は広いが、看板、門、旗、鐘楼を追えば迷いにくい。"] },
   reception_after: { speaker: "ギルド受付", lines: ["受付処理は進んでいます。次は指定された目的を済ませてください。", "同じ説明を聞くより、行動で確認する方が早いです。"] },
-  priest_after: { speaker: "司祭", lines: ["確認書の話は済みました。ギルドに戻れば受付が読めるはずです。"] }
+  priest_after: { speaker: "司祭", lines: ["確認書の話は済みました。ギルドに戻れば受付が読めるはずです。"] },
+  market_vendor: { speaker: "市場の商人", lines: ["荷札のない品は売れないよ。王都では安さより、誰が保証する品かが大事なんだ。"] },
+  adventurer_chatter: { speaker: "冒険者", lines: ["ギルド証なしで剣を抜くなよ。腕前より先に罰金と身元照会が来る。"] },
+  church_faithful: { speaker: "信徒", lines: ["教会は祈る場所でもあり、記録を預かる場所でもあります。名前を残すことは、この街で生きる足場です。"] },
+  guard_checkpoint: { speaker: "北門衛兵", lines: ["北門を抜けた者は台帳に残る。紹介状があるなら、先にギルドへ見せるといい。"] },
+  alley_broker: { speaker: "情報屋", lines: ["表通りで買えないものは、だいたいここに流れてくる。だが、身元のない客ほど高くつく。"] },
+  blacksmith: { speaker: "鍛冶職人", lines: ["武器は持ち主の信用も背負う。登録前の客には、刃を研ぐだけでも保証人が要る。"] },
+  innkeeper: { speaker: "宿屋の女将", lines: ["部屋は空いてるよ。ただし長逗留ならギルド証か教会の確認書を見せてもらう。"] }
 };
 
 const state = {
   player: { stamina: 100, maxStamina: 100, ...structuredClone(data.player) },
-  quest: structuredClone(data.quests), map: data.startMap || "forestRoad",
+  quest: structuredClone(data.quests), map: debugStartMap || data.startMap || "forestRoad",
   keys: new Set(), yaw: 0, pitch: .06, cameraMode: "third", debug: false,
   started: false, dragging: false, lastX: 0, lastY: 0, activeTarget: null,
   inDialogue: false, dialogueId: null, dialogueLine: 0, selectedChoice: 0, choiceCooldown: 0,
-  padButtons: [], isDashing: false, dodgeTimer: 0, castCooldown: 0
+  padButtons: [], isDashing: false, dodgeTimer: 0, castCooldown: 0, castMaxCooldown: .28,
+  fireCooldown: 0, burstCooldown: 0, fireMaxCooldown: .32, burstMaxCooldown: .95,
+  cameraShake: 0, hitStop: 0, magicPulse: 0
 };
 
 const scene = new THREE.Scene();
@@ -54,13 +67,29 @@ let beast = null;
 let merchant = null;
 const projectiles = [];
 const bursts = [];
+const tempLights = [];
 
 initLights();
-loadMap(state.map, data.startSpawn || { x: 0, z: 74 });
+loadMap(state.map, initialSpawn(state.map));
 updateHud();
 setTimeout(() => ui.loading.classList.add("is-hidden"), 250);
 requestAnimationFrame(loop);
+exposeDebugApi();
 
+function exposeDebugApi(){
+  if(!bootParams.has("debug")) return;
+  window.__AURELIA_DEBUG__ = {
+    state, player, loadMap, tryMove, castFireball, toggleCamera, colliderAt,
+    setPlayer(x,z){ player.position.set(x,0,z); },
+    counts(){ return { map:state.map, colliders:colliders.length, movers:movers.length, npcs:npcs.length, locations:locations.length, projectiles:projectiles.length }; },
+    sampleMovers(){ return movers.slice(0,5).map(m=>({ type:m.type, x:+m.object.position.x.toFixed(2), z:+m.object.position.z.toFixed(2) })); },
+    locations(){ return locations.map(l=>({ id:l.id, targetMap:l.targetMap || null, x:l.position.x, z:l.position.z })); }
+  };
+}
+
+function initialSpawn(id){
+  return ({ forestRoad: data.startSpawn || { x: 0, z: 74 }, plaza: { x: 0, z: 185 }, guildHall: { x: 0, z: 6.4 }, church: { x: 0, z: 5.5 }, trainingGround: { x: 0, z: 48 } })[id] || data.startSpawn || { x: 0, z: 74 };
+}
 function initLights(){
   scene.add(new THREE.HemisphereLight(0xf7eddb, 0x28364a, 2.75));
   const sun = new THREE.DirectionalLight(0xfff0ce, 3.2);
@@ -90,7 +119,7 @@ function loadMap(id, spawn){
   npcs.forEach(n => scene.remove(n));
   npcs = []; locations = []; colliders = []; movers = [];
   caravan = beast = merchant = null;
-  projectiles.length = 0; bursts.length = 0;
+  projectiles.length = 0; bursts.length = 0; tempLights.length = 0;
 
   ({ forestRoad: buildForestRoad, plaza: buildKingdom, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround }[id] || buildKingdom)();
 
@@ -110,12 +139,24 @@ function loadMap(id, spawn){
 }
 function env(color, near, far){ scene.background = new THREE.Color(color); scene.fog = new THREE.Fog(color, near, far); }
 function addCollider(x,z,w,d,label=""){ colliders.push({ x, z, w, d, label }); }
-function isBlocked(x,z,r=.58){
+function colliderAt(x,z,r=.58, dynamic=true){
   for(const c of colliders){
-    if(x > c.x - c.w/2 - r && x < c.x + c.w/2 + r && z > c.z - c.d/2 - r && z < c.z + c.d/2 + r) return true;
+    if(x > c.x - c.w/2 - r && x < c.x + c.w/2 + r && z > c.z - c.d/2 - r && z < c.z + c.d/2 + r) return c;
   }
-  return false;
+  if(dynamic){
+    for(const m of movers){
+      const rr=(m.radius || (m.type==="cart"?2.15:.68)) + r;
+      if(Math.hypot(x-m.object.position.x,z-m.object.position.z)<rr) return m;
+    }
+    for(const n of npcs){
+      if(n.visible===false) continue;
+      const rr=(n.userData?.radius || .72) + r;
+      if(Math.hypot(x-n.position.x,z-n.position.z)<rr) return n.userData || n;
+    }
+  }
+  return null;
 }
+function isBlocked(x,z,r=.58){ return Boolean(colliderAt(x,z,r,true)); }
 function placeBox(x,y,z,w,h,d,color,label="",parent=world){
   const m = add(new THREE.BoxGeometry(w,h,d), mat(color), parent);
   m.position.set(x,y,z);
@@ -187,15 +228,18 @@ function buildKingdom(){
   addChurchExterior(-74,-44);
   addTrainingYard(128,78);
   addMarketBlock(82,20);
+  addShopRow();
   addNobleBlock(-105,-80);
   addBarracks(120,-80);
   addSlumBlock(-120,80);
   addSuspiciousAlley(-148,72);
 
+  const reservedZones = [[0,0,44],[28,-44,32],[-74,-44,34],[82,20,58],[128,78,54],[-105,-80,66],[-120,80,68],[-148,72,46],[0,-150,58],[0,185,32],[120,-80,42]];
   for(let gx=-168; gx<=168; gx+=28){
     for(let gz=-168; gz<=168; gz+=28){
       if(Math.abs(gx)<24 || Math.abs(gz)<24 || Math.hypot(gx,gz)<36) continue;
       if(gx < -100 && gz > 45) continue;
+      if(reservedZones.some(([rx,rz,rr])=>Math.hypot(gx-rx,gz-rz)<rr)) continue;
       if(Math.random()<.78) addMedievalHouse(gx+rand(-4,4),gz+rand(-4,4),rand(5.2,9.5),rand(4.8,9),rand(3.2,6.8), pick([0x7b5a3d,0x83684d,0x6d5d4a,0x8d6542]));
     }
   }
@@ -209,6 +253,7 @@ function buildKingdom(){
 
   addTrafficCarts();
   addPedestrians();
+  addRoleNpcs();
   addStreetDetails();
   [[0,185,"NORTH GATE"],[28,-31,"GUILD"],[-74,-31,"CHURCH"],[128,94,"TRAINING"],[0,-135,"CASTLE"],[-148,72,"ALLEY"]].forEach(v=>addSignPost(...v));
 }
@@ -279,41 +324,107 @@ function addCastle(x,z){
     const roof=add(new THREE.ConeGeometry(6,8,4),mat(0x394456)); roof.position.set(x+sx,23,z); roof.rotation.y=Math.PI/4;
   }
 }
-function addMedievalHouse(x,z,w,d,h,color){
-  const g = new THREE.Group(); g.position.set(x,0,z); g.rotation.y = rand(-.03,.03); world.add(g);
-  placeBox(0,h/2,0,w,h,d,color,"",g);
-  const roof = add(new THREE.ConeGeometry(Math.max(w,d)*.73,2.6,4), mat(pick([0x3b2a1e,0x2c4256,0x742831,0x4d2f28])), g);
-  roof.position.set(0,h+1.25,0); roof.rotation.y=Math.PI/4;
-  for(const sx of [-w*.28,w*.28]) for(const yy of [1.6,2.75]){
-    placeBox(sx,yy,d/2+.04,.7,.8,.08,0x9b835d,"",g);
-    placeBox(sx,yy,d/2+.09,.48,.56,.04,0x83a4b6,"",g);
+function addMedievalHouse(x,z,w,d,h,color, signText=null){
+  const g = new THREE.Group(); g.position.set(x,0,z); g.rotation.y = rand(-.035,.035); world.add(g);
+  const upper = Math.max(0, h-2.3);
+  placeBox(0,1.05,0,w*.94,2.1,d*.94,0x76614a,"",g);
+  placeBox(0,2.15+upper/2,0,w,upper,d,color,"",g);
+  placeBox(0,2.24,d/2+.05,w+.45,.18,.18,0x352317,"",g);
+  placeBox(0,2.24,-d/2-.05,w+.45,.18,.18,0x352317,"",g);
+  for(const sx of [-w*.46,w*.46]) placeBox(sx,2.2,0,.18,Math.max(2.1,h-.3),d+.18,0x352317,"",g);
+  for(const sx of [-w*.24,w*.24]) placeBox(sx,2.45,d/2+.08,.16,h*.78,.16,0x3d291a,"",g);
+  for(const sx of [-w*.36,w*.36]){ const brace=placeBox(sx,2.55,d/2+.14,.16,h*.64,.14,0x3d291a,"",g); brace.rotation.z=sx<0?.42:-.42; }
+  const roofColor = pick([0x3b2a1e,0x2c4256,0x742831,0x4d2f28]);
+  const roof = add(new THREE.ConeGeometry(Math.max(w,d)*.78,2.8,4), mat(roofColor), g);
+  roof.position.set(0,h+1.35,0); roof.rotation.y=Math.PI/4;
+  placeBox(0,h+.25,d/2+.35,w+.9,.26,.3,roofColor,"",g);
+  placeBox(0,h+.25,-d/2-.35,w+.9,.26,.3,roofColor,"",g);
+  for(const sx of [-w*.28,w*.28]) for(const yy of [1.55,2.85]){
+    placeBox(sx,yy,d/2+.08,.82,.9,.09,0x5b3a24,"",g);
+    placeBox(sx,yy,d/2+.145,.54,.58,.045,0x83a4b6,"",g);
+    placeBox(sx,yy,d/2+.18,.08,.72,.04,0x2b1b12,"",g);
   }
-  placeBox(0,1.05,d/2+.08,1.15,1.85,.12,0x201610,"",g);
-  if(Math.random()<.55){
-    const sign = createLabel(pick(["INN","BAKER","SMITH","TOOLS","HERBS"]));
-    sign.scale.set(1.05,.28,1); sign.position.set(rand(-w*.3,w*.3),2.55,d/2+.35); g.add(sign);
+  placeBox(0,1.03,d/2+.12,1.2,1.9,.14,0x201610,"",g);
+  placeBox(0,2.05,d/2+.17,1.45,.16,.16,0x8c6740,"",g);
+  const sign = signText ?? (Math.random()<.6 ? pick(["INN","BAKER","SMITH","TOOLS","HERBS","TAVERN"]) : null);
+  if(sign){
+    const board = createLabel(sign);
+    board.scale.set(1.05,.28,1); board.position.set(rand(-w*.28,w*.28),2.58,d/2+.42); g.add(board);
+    placeBox(board.position.x,2.34,d/2+.24,.08,.48,.08,0x2a1b10,"",g);
   }
-  if(Math.random()<.45) placeBox(-w*.35,h+1.4,-d*.2,.45,1.7,.45,0x50453b,"",g);
+  if(Math.random()<.58) placeBox(-w*.34,h+1.35,-d*.2,.46,1.75,.46,0x50453b,"",g);
   addCollider(x,z,w,d,"house");
 }
 function addGuildExterior(x,z){
-  addMedievalHouse(x,z,16,12,7.5,0x6a5036);
+  addMedievalHouse(x,z,16,12,7.5,0x6a5036,"GUILD");
   placeBox(x,2,z+6.3,3.2,4,.4,0x201610,"guildDoor");
+  placeBox(x-5.7,2.5,z+6.4,.38,4.6,.38,0x3a2415,"",world);
+  placeBox(x+5.7,2.5,z+6.4,.38,4.6,.38,0x3a2415,"",world);
+  placeBox(x,4.55,z+6.55,12.8,.34,.34,0x3a2415,"",world);
+  const emblem=add(new THREE.OctahedronGeometry(.75,0),mat(0xd8b36b,.6,0xd8b36b,.18)); emblem.position.set(x,4.25,z+6.85);
+  addQuestBoard(x-8.8,z+5.8);
   addSignPost(x,z+9,"GUILD");
 }
 function addChurchExterior(x,z){
-  addMedievalHouse(x,z,15,12,9,0x7c7a76);
+  addMedievalHouse(x,z,15,12,9,0x7c7a76,"CHURCH");
+  placeBox(x,4.8,z-1,8,8,13,0x777873,"churchStone");
   const sp=add(new THREE.ConeGeometry(3,11,4),mat(0x2f3541)); sp.position.set(x,16,z); sp.rotation.y=Math.PI/4;
+  for(const sx of [-6.8,6.8]){ placeBox(x+sx,3.2,z,1.1,6.2,2.1,0x5f625f,"buttress"); }
+  for(const sx of [-2.6,0,2.6]){ placeBox(x+sx,4.2,z+6.25,1.1,2.3,.12,0x547d9a,"",world); }
+  placeBox(x,10.8,z+6.35,.32,2.7,.18,0xd8d1bc,"",world);
+  placeBox(x,11.7,z+6.36,1.6,.28,.18,0xd8d1bc,"",world);
   addSignPost(x,z+9,"CHURCH");
 }
 function addMarketBlock(x,z){
-  for(let i=0;i<28;i++){
-    const g=new THREE.Group(); g.position.set(x+rand(-32,32),0,z+rand(-32,32)); world.add(g);
-    placeBox(0,.35,0,2.7,.7,1.5,0x6a4d35,"",g);
-    const roof=placeBox(0,1.35,0,3.2,.12,2.1,pick([0xb43d46,0x2f6f9f,0xd8b36b,0x3f815a]),"",g);
-    roof.rotation.z=rand(-.1,.1);
-    for(let j=0;j<4;j++){ const item=add(new THREE.DodecahedronGeometry(.13,0),mat(pick([0xbf5545,0xd8b36b,0x5f9056,0x8f6b3f])),g); item.position.set(rand(-.9,.9),.82,rand(-.45,.45)); }
+  for(let i=0;i<30;i++){
+    const px=x+rand(-34,34), pz=z+rand(-34,34);
+    const g=new THREE.Group(); g.position.set(px,0,pz); g.rotation.y=rand(-.18,.18); world.add(g);
+    placeBox(0,.35,0,2.9,.7,1.55,0x6a4d35,"",g);
+    placeBox(-1.22,.95,-.68,.1,1.4,.1,0x3c2818,"",g);
+    placeBox(1.22,.95,-.68,.1,1.4,.1,0x3c2818,"",g);
+    placeBox(-1.22,.95,.68,.1,1.4,.1,0x3c2818,"",g);
+    placeBox(1.22,.95,.68,.1,1.4,.1,0x3c2818,"",g);
+    const roof=placeBox(0,1.45,0,3.45,.16,2.25,pick([0xb43d46,0x2f6f9f,0xd8b36b,0x3f815a]),"",g);
+    roof.rotation.z=rand(-.08,.08);
+    for(let j=0;j<6;j++){
+      const item=add(new THREE.DodecahedronGeometry(.13,0),mat(pick([0xbf5545,0xd8b36b,0x5f9056,0x8f6b3f,0xc9c4ad])),g);
+      item.position.set(rand(-1.0,1.0),.83,rand(-.5,.5));
+    }
+    if(i%5===0){ const label=createLabel(pick(["BREAD","MEAT","SPICE","CLOTH","POTION"])); label.scale.set(.9,.23,1); label.position.set(0,1.9,.95); g.add(label); }
+    addCollider(px,pz,3.15,1.9,"stall");
   }
+}
+function addShopRow(){
+  addNamedShop(112,-28,"INN","inn",0x806348);
+  addNamedShop(136,-28,"SMITH","smith",0x6b6256);
+  addNamedShop(112,-58,"HERBS","herbalist",0x5f7550);
+  addNamedShop(136,-58,"TAVERN","tavern",0x7b4f3a);
+  addNamedShop(94,-74,"EATERY","eatery",0x83684d);
+}
+function addNamedShop(x,z,label,type,color){
+  addMedievalHouse(x,z,10,8,5.8,color,label);
+  if(type==="smith"){
+    placeBox(x-5.8,.55,z+3.8,2.3,.8,1.8,0x3b3028,"anvilTable");
+    placeBox(x-5.8,1.15,z+3.8,.72,.42,.34,0x25282b,"anvil");
+    const fire=add(new THREE.SphereGeometry(.32,12,8),mat(0xff6b24,.35,0xff4b16,1.2)); fire.position.set(x-7.1,.95,z+3.6);
+  }
+  if(type==="herbalist"){ for(let i=0;i<6;i++) placeCylinder(x-5+i*.55,.55,z+4.2,.12,.42,pick([0x5f9056,0x3f815a,0x8fa86a]),"pot"); }
+  if(type==="inn"||type==="tavern"||type==="eatery"){
+    addTable(x-5.6,z+4.0); addBarrel(x-7.6,z+2.7);
+  }
+}
+function addRoleNpcs(){
+  const roles=[
+    ["market_vendor","merchant","薬草商",88,20,"market_vendor"],["market_vendor2","merchant","香辛料商",108,12,"market_vendor"],
+    ["guild_adv","adventurer","剣盾の冒険者",35,-23,"adventurer_chatter"],["guild_adv2","veteran","斥候風の冒険者",18,-25,"adventurer_chatter"],
+    ["church_faithful","pilgrim","祈る信徒",-68,-24,"church_faithful"],["church_acolyte","priest","教会見習い",-82,-27,"church_faithful"],
+    ["gate_guard","guard","北門衛兵",-8,176,"guard_checkpoint"],["alley_broker","shady","情報屋",-148,92,"alley_broker"],
+    ["smith_owner","blacksmith","鍛冶職人",136,-19,"blacksmith"],["innkeeper","commoner","宿屋の女将",112,-19,"innkeeper"]
+  ];
+  roles.forEach(([id,variant,name,x,z,dialogue])=>addNpc({ id, variant, name, position:{x,z}, color:roleColor(variant), dialogue, radius:.78 }));
+}
+function roleColor(v){
+  return ({ merchant:0x9a6f54, adventurer:0x4d6388, pilgrim:0xc9c4ad, priest:0xd5cfbc, guard:0xb77954, shady:0x272331, blacksmith:0x6c5a4a, commoner:0x7f9fbd, veteran:0x8c6f4f })[v] || 0x7f9fbd;
 }
 function addSlumBlock(x,z){
   for(let i=0;i<38;i++) addMedievalHouse(x+rand(-48,48),z+rand(-38,38),rand(3,6),rand(3,6),rand(2.2,4),pick([0x5d4b39,0x4f4238,0x6d5237]));
@@ -331,15 +442,20 @@ function addTrainingYard(x,z){
   addSignPost(x,z+18,"TRAINING");
 }
 function addSuspiciousAlley(x,z){
-  addRoad(x,z,10,70,0x3e3830);
-  for(let i=0;i<8;i++){
-    placeBox(x-6,2.5,z-30+i*8,4,5,7,pick([0x41382f,0x4b3b32,0x3f3f3a]),"alleyHouse");
-    placeBox(x+6,2.5,z-30+i*8,4,5,7,pick([0x41382f,0x4b3b32,0x3f3f3a]),"alleyHouse");
+  addRoad(x,z,8.5,74,0x312d29);
+  for(let i=0;i<9;i++){
+    const zz=z-33+i*8;
+    placeBox(x-5.2,2.7,zz,4.4,5.4,7.2,pick([0x3b332d,0x4b3b32,0x3f3f3a]),"alleyHouse");
+    placeBox(x+5.2,2.7,zz,4.4,5.4,7.2,pick([0x3b332d,0x4b3b32,0x3f3f3a]),"alleyHouse");
+    if(i%2===0) addHangingCloth(x,zz+2.2,pick([0x5d2d35,0x6d5d4a,0x2f4550]));
+    if(i%3===0) addDimLantern(x+(i%2?3.1:-3.1),zz);
   }
-  for(let i=0;i<14;i++) addCrateStack(x+rand(-3,3),z+rand(-30,30),Math.floor(rand(2,5)));
-  const hood = createPerson({ variant:"priest", color:0x272331 });
+  for(let i=0;i<18;i++) addCrateStack(x+rand(-2.8,2.8),z+rand(-32,32),Math.floor(rand(2,5)));
+  for(let i=0;i<9;i++) addBarrel(x+rand(-3.2,3.2),z+rand(-30,30));
+  addHiddenDoor(x-4.85,z+22);
+  const hood = createPerson({ variant:"shady", color:0x272331 });
   hood.position.set(x,0,z+18);
-  hood.userData={ id:"shady_man", kind:"npc", name:"路地裏の男", dialogue:"shady_alley" };
+  hood.userData={ id:"shady_man", kind:"npc", name:"路地裏の男", dialogue:"shady_alley", radius:.8 };
   const label=createLabel("???"); label.scale.set(.9,.24,1); label.position.set(0,2.55,0); hood.add(label);
   scene.add(hood); npcs.push(hood);
 }
@@ -363,6 +479,30 @@ function addTree(x,z,s=1,solid=false){
 }
 function addCrateStack(x,z,n){
   for(let i=0;i<n;i++) placeBox(x+(i%2)*.75,.35+Math.floor(i/2)*.38,z+Math.floor(i/2)*.75,.7,.7,.7,0x735334,"crate");
+}
+function addBarrel(x,z,parent=world){
+  const b=add(new THREE.CylinderGeometry(.36,.4,.74,10),mat(0x6a4328),parent);
+  b.position.set(parent===world?x:0,.38,parent===world?z:0);
+  placeBox(parent===world?x:0,.72,parent===world?z:0,.82,.08,.82,0x352317,"",parent);
+  if(parent===world) addCollider(x,z,.8,.8,"barrel");
+  return b;
+}
+function addSack(x,y,z,parent=world){
+  const s=add(new THREE.SphereGeometry(.32,10,8),mat(0x9a7b4d),parent);
+  s.position.set(x,y,z); s.scale.set(1.15,.72,.9);
+  return s;
+}
+function addHangingCloth(x,z,color){
+  placeBox(x,2.75,z,7.2,.08,.08,0x2b1b12,"",world);
+  const cloth=placeBox(x,2.15,z,2.4,1.1,.08,color,"",world); cloth.rotation.z=rand(-.08,.08);
+}
+function addHiddenDoor(x,z){
+  placeBox(x,1.05,z,.18,2.1,1.35,0x241711,"hiddenDoor");
+  const mark=add(new THREE.TorusGeometry(.28,.025,6,16),mat(0x624325,.6,0x624325,.18)); mark.position.set(x+.12,1.32,z); mark.rotation.y=Math.PI/2;
+}
+function addDimLantern(x,z){
+  placeCylinder(x,1.35,z,.06,2.2,0x29221d);
+  const l=add(new THREE.SphereGeometry(.15,8,6),mat(0xb46d2a,.45,0xb46d2a,.65)); l.position.set(x,2.35,z);
 }
 function addLamp(x,z){
   placeCylinder(x,1.4,z,.08,2.8,0x3d342f);
@@ -419,7 +559,7 @@ function addPedestrians(){
     const start = path[0];
     p.position.set(start[0]+rand(-2,2),0,start[1]+rand(-2,2));
     scene.add(p);
-    movers.push({ type:"ped", object:p, path, index:1, speed:rand(1.2,2.3), wait:rand(0,1) });
+    movers.push({ type:"ped", object:p, path, index:1, speed:rand(1.2,2.3), wait:rand(0,1), radius:.68 });
   }
 }
 function addWanderingGuards(){
@@ -427,7 +567,7 @@ function addWanderingGuards(){
     const g=createPerson({variant:"guard",color:0xb77954});
     g.position.set(rand(-6,6),0,rand(-70,55));
     scene.add(g);
-    movers.push({ type:"ped", object:g, path:[[rand(-5,5),rand(60,80)],[rand(-5,5),rand(15,20)],[rand(-5,5),rand(-90,-70)]], index:1, speed:1.7, wait:0 });
+    movers.push({ type:"ped", object:g, path:[[rand(-5,5),rand(60,80)],[rand(-5,5),rand(15,20)],[rand(-5,5),rand(-90,-70)]], index:1, speed:1.7, wait:0, radius:.72 });
   }
 }
 function addTrafficCarts(){
@@ -442,16 +582,24 @@ function addTrafficCarts(){
     const start=path[0];
     cart.position.set(start[0],0,start[1]+i*2);
     world.add(cart);
-    movers.push({ type:"cart", object:cart, path, index:1, speed:rand(2.0,3.4), wait:0 });
+    movers.push({ type:"cart", object:cart, path, index:1, speed:rand(2.0,3.4), wait:0, radius:2.25 });
   }
 }
 function createMovingCart(){
   const g=new THREE.Group();
-  placeBox(0,.55,0,2.6,.75,1.5,0x70482c,"",g);
-  const horse=createHorse(); horse.position.set(0,0,-1.45); g.add(horse);
-  for(const sx of [-1.25,1.25]) for(const sz of [-.65,.65]){
-    const w=add(new THREE.TorusGeometry(.34,.07,8,18),mat(0x2c2018),g); w.position.set(sx,.35,sz); w.rotation.y=Math.PI/2;
+  placeBox(0,.52,0,2.9,.65,1.65,0x70482c,"",g);
+  placeBox(0,.98,0,2.65,.18,1.45,0x8a5d38,"",g);
+  placeBox(-1.48,.85,0,.16,.75,1.7,0x3b2a1d,"",g);
+  placeBox(1.48,.85,0,.16,.75,1.7,0x3b2a1d,"",g);
+  const axle=add(new THREE.CylinderGeometry(.07,.07,3.3,10),mat(0x2c2018),g); axle.position.set(0,.34,0); axle.rotation.z=Math.PI/2;
+  const horse=createHorse(); horse.position.set(0,0,-1.72); g.add(horse);
+  for(const sx of [-1.35,1.35]) for(const sz of [-.72,.72]){
+    const w=add(new THREE.TorusGeometry(.38,.075,8,20),mat(0x2c2018),g); w.position.set(sx,.35,sz); w.rotation.y=Math.PI/2;
+    placeCylinder(sx,.35,sz,.04,.82,0x8a6f4b,"",g).rotation.x=Math.PI/2;
   }
+  for(let i=0;i<4;i++) addSack(rand(-.8,.8),1.17,rand(-.45,.45),g);
+  const reinL=placeBox(-.25,1.05,-1.12,.04,.04,1.4,0x2a1a12,"",g); reinL.rotation.x=.1;
+  const reinR=placeBox(.25,1.05,-1.12,.04,.04,1.4,0x2a1a12,"",g); reinR.rotation.x=.1;
   return g;
 }
 function updateMovers(dt){
@@ -467,25 +615,61 @@ function updateMovers(dt){
     obj.rotation.y = Math.atan2(vx,vz);
     if(m.type==="ped") obj.position.y = Math.abs(Math.sin(clock.elapsedTime*5))*0.025;
   }
+  resolveDynamicContacts();
+}
+function resolveDynamicContacts(){
+  if(state.debug || state.inDialogue) return;
+  const px=player.position.x, pz=player.position.z;
+  for(const m of movers){
+    const rr=(m.radius || (m.type==="cart"?2.15:.68)) + .62;
+    const dx=px-m.object.position.x, dz=pz-m.object.position.z, dist=Math.hypot(dx,dz);
+    if(dist>0.001 && dist<rr){
+      const push=(rr-dist)*.65;
+      player.position.x=THREE.MathUtils.clamp(player.position.x+(dx/dist)*push,bounds.minX,bounds.maxX);
+      player.position.z=THREE.MathUtils.clamp(player.position.z+(dz/dist)*push,bounds.minZ,bounds.maxZ);
+    }
+  }
+  for(const n of npcs){
+    if(n.visible===false) continue;
+    const rr=(n.userData?.radius || .72)+.58;
+    const dx=player.position.x-n.position.x, dz=player.position.z-n.position.z, dist=Math.hypot(dx,dz);
+    if(dist>0.001 && dist<rr){
+      const push=(rr-dist)*.5;
+      player.position.x=THREE.MathUtils.clamp(player.position.x+(dx/dist)*push,bounds.minX,bounds.maxX);
+      player.position.z=THREE.MathUtils.clamp(player.position.z+(dz/dist)*push,bounds.minZ,bounds.maxZ);
+    }
+  }
 }
 
 function addCaravanScene(x,z){
   const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=-.22; world.add(g); caravan=g;
-  const cart=placeBox(0,.55,0,2.4,.6,1.45,0x6a4328,"",g); cart.rotation.z=questDone("merchant")?.05:-.18;
-  const axle=add(new THREE.CylinderGeometry(.08,.08,2.9,10),mat(0x3b2a1d),g); axle.rotation.z=Math.PI/2; axle.position.set(0,.32,0);
-  for(const sx of [-1.25,1.25]) for(const sz of [-.66,.66]){ const w=add(new THREE.TorusGeometry(.36,.075,8,18),mat(0x2c2018),g); w.position.set(sx,.35,sz); w.rotation.y=Math.PI/2; }
-  for(let i=0;i<10;i++){ const b=placeBox(rand(-.9,.9),.95+Math.floor(i/3)*.33,rand(-.52,.52),.48,.38,.48,pick([0x8c6239,0x6d5237,0x9a7b4d]),"",g); b.rotation.y=rand(-.45,.45); }
-  const horse=createHorse(); horse.position.set(-2.15,.05,0); horse.rotation.y=Math.PI/2; g.add(horse);
-  merchant=createPerson({id:"merchant",variant:"traveler",color:0x6f8aa6}); merchant.position.set(.78,.06,questDone("merchant")?1.55:1.08); merchant.rotation.z=questDone("merchant")?0:Math.PI/2; merchant.rotation.y=questDone("merchant")?Math.PI:0; g.add(merchant);
+  const cart=placeBox(0,.55,0,2.7,.65,1.55,0x6a4328,"",g); cart.rotation.z=questDone("merchant")?.05:-.18;
+  placeBox(0,.95,0,2.55,.16,1.35,0x8a5d38,"",g);
+  const axle=add(new THREE.CylinderGeometry(.08,.08,3.15,10),mat(0x3b2a1d),g); axle.rotation.z=Math.PI/2; axle.position.set(0,.32,0);
+  for(const sx of [-1.28,1.28]) for(const sz of [-.68,.68]){ const w=add(new THREE.TorusGeometry(.38,.08,8,20),mat(0x2c2018),g); w.position.set(sx,.35,sz); w.rotation.y=Math.PI/2; }
+  for(let i=0;i<9;i++){ const b=placeBox(rand(-.95,.95),.92+Math.floor(i/3)*.33,rand(-.55,.55),.5,.38,.48,pick([0x8c6239,0x6d5237,0x9a7b4d]),"",g); b.rotation.y=rand(-.45,.45); }
+  for(let i=0;i<4;i++) addSack(rand(-.8,.8),1.38,rand(-.52,.52),g);
+  for(let i=0;i<5;i++){ const plank=placeBox(rand(-1.5,1.8),.12,rand(-1.05,1.05),1.2,.09,.18,0x4a2f1e,"",g); plank.rotation.y=rand(-.8,.8); plank.rotation.z=rand(-.2,.2); }
+  const scorch=add(new THREE.CircleGeometry(.75,16),mat(0x17100c,.95,0x3a1306,.18),g,false,true); scorch.rotation.x=-Math.PI/2; scorch.position.set(1.7,.035,-.8);
+  const stain=add(new THREE.CircleGeometry(.35,12),mat(0x4d0f0d,.9,0x2a0504,.1),g,false,true); stain.rotation.x=-Math.PI/2; stain.position.set(.95,.04,.95); stain.scale.set(1.7,.8,1);
+  const horse=createHorse(); horse.position.set(-2.25,.05,0); horse.rotation.y=Math.PI/2; g.add(horse);
+  const rein=placeBox(-1.2,1.0,0,.04,.04,1.75,0x2a1a12,"",g); rein.rotation.y=Math.PI/2;
+  merchant=createPerson({id:"merchant",variant:"merchant",color:0x6f8aa6}); merchant.position.set(.78,.06,questDone("merchant")?1.55:1.08); merchant.rotation.z=questDone("merchant")?0:Math.PI/2; merchant.rotation.y=questDone("merchant")?Math.PI:0; g.add(merchant);
   if(!questDone("merchant")){ beast=createBeast(); beast.position.set(2.05,.05,-.55); beast.rotation.y=-Math.PI/2; g.add(beast); } else { const s=createLabel("RESCUED"); s.scale.set(1.25,.34,1); s.position.set(0,1.75,0); g.add(s); }
-  addCollider(x,z,4.2,3.4,"caravan");
+  addCollider(x,z,4.6,3.8,"caravan");
 }
 function createHorse(){
   const g=new THREE.Group();
-  placeBox(0,.78,0,1.15,.55,.38,0x5b3a28,"",g);
-  const neck=placeBox(.5,1.05,0,.25,.55,.22,0x5b3a28,"",g); neck.rotation.z=-.35;
-  placeBox(.75,1.25,0,.35,.25,.25,0x5b3a28,"",g);
-  for(const x of [-.38,.38]) for(const z of [-.14,.14]) placeBox(x,.34,z,.12,.65,.12,0x3b281d,"",g);
+  placeBox(0,.78,0,1.2,.56,.42,0x5b3a28,"",g);
+  const neck=placeBox(.52,1.06,0,.26,.58,.24,0x5b3a28,"",g); neck.rotation.z=-.35;
+  placeBox(.78,1.28,0,.38,.28,.28,0x5b3a28,"",g);
+  placeBox(.97,1.25,0,.18,.12,.18,0x2b1b12,"",g);
+  placeBox(-.58,.92,0,.18,.36,.42,0x241711,"",g);
+  for(const x of [-.4,.4]) for(const z of [-.15,.15]){
+    placeBox(x,.34,z,.12,.68,.12,0x3b281d,"",g);
+    placeBox(x,.06,z,.18,.12,.18,0x20140f,"",g);
+  }
+  for(const z of [-.08,.08]){ const eye=add(new THREE.SphereGeometry(.025,8,6),mat(0x09090d),g); eye.position.set(.92,1.32,z); }
   return g;
 }
 function createBeast(){
@@ -500,20 +684,37 @@ function createBeast(){
 }
 function createBurst(pos,color=0xff7a1c){
   const group=new THREE.Group(); group.position.copy(pos); world.add(group);
-  for(let i=0;i<18;i++){ const s=add(new THREE.SphereGeometry(.06,8,6),mat(color,.32,color,1.5),group,false,false); const a=i/18*Math.PI*2; s.userData.vel=new THREE.Vector3(Math.cos(a)*rand(1.4,3.1),rand(.4,1.8),Math.sin(a)*rand(1.4,3.1)); }
-  bursts.push({ group, life:.52, max:.52 });
+  for(let i=0;i<22;i++){
+    const s=add(new THREE.SphereGeometry(.06,8,6),mat(color,.32,color,1.5),group,false,false);
+    const a=i/22*Math.PI*2, lift=rand(.4,2.0), spread=rand(1.6,3.6);
+    s.userData.vel=new THREE.Vector3(Math.cos(a)*spread,lift,Math.sin(a)*spread);
+  }
+  const flash=new THREE.PointLight(color,5.5,13); flash.position.set(0,.35,0); group.add(flash);
+  bursts.push({ group, light:flash, life:.52, max:.52 });
+}
+function aimDirection(){
+  return new THREE.Vector3(-Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),-Math.cos(state.yaw)*Math.cos(state.pitch)).normalize();
 }
 function castFireball(mode="action"){
-  if(state.castCooldown>0 && mode !== "story") return;
-  state.castCooldown = mode==="burst" ? .55 : .28;
-  const start=new THREE.Vector3();
-  camera.getWorldPosition(start);
-  if(state.cameraMode!=="first") start.copy(player.position).add(new THREE.Vector3(0,1.35,0));
-  const dir=new THREE.Vector3(); camera.getWorldDirection(dir); dir.normalize();
-  const ball=add(new THREE.SphereGeometry(mode==="burst"?.34:.22,16,10),mat(0xff7a1c,.2,0xff5a00,2.2),world,false,false); ball.position.copy(start);
+  const story=mode==="story", strong=mode==="burst";
+  const cooldown=strong?.95:.32, cost=story?0:(strong?7:2);
+  if(!story){
+    if(strong ? state.burstCooldown>0 : state.fireCooldown>0) return;
+    if(state.player.mp < cost){ state.magicPulse=.3; updateMagicUi(); return; }
+    state.player.mp=Math.max(0,state.player.mp-cost);
+    if(strong) state.burstCooldown=state.burstMaxCooldown=cooldown; else state.fireCooldown=state.fireMaxCooldown=cooldown;
+    state.castCooldown=cooldown; state.castMaxCooldown=cooldown;
+    updateHud();
+  }
+  const dir=aimDirection();
+  const start=player.position.clone().add(new THREE.Vector3(0,state.cameraMode==="first"?1.58:1.35,0)).addScaledVector(dir,.48);
+  const ball=add(new THREE.SphereGeometry(strong?.34:.22,16,10),mat(strong?0xffb347:0xff7a1c,.2,strong?0xff8a00:0xff5a00,2.4),world,false,false);
+  ball.position.copy(start);
+  ball.add(new THREE.PointLight(strong?0xffb347:0xff6a1a,strong?3.2:2.2,strong?7:5));
   let target=null;
-  if(mode==="story" && beast){ target=new THREE.Vector3(); beast.getWorldPosition(target); target.y=.8; }
-  projectiles.push({ mesh:ball, dir, start:start.clone(), target, t:0, speed: mode==="burst"?42:32, life:2.5, mode });
+  if(story && beast){ target=new THREE.Vector3(); beast.getWorldPosition(target); target.y=.8; }
+  state.cameraShake=Math.max(state.cameraShake,strong?.08:.035);
+  projectiles.push({ mesh:ball, dir, start:start.clone(), target, t:0, speed: strong?44:34, life:2.5, mode });
 }
 function dodge(){
   if(state.inDialogue||!state.started)return;
@@ -524,6 +725,11 @@ function dodge(){
 }
 function updateEffects(dt,t){
   state.castCooldown=Math.max(0,state.castCooldown-dt);
+  state.fireCooldown=Math.max(0,state.fireCooldown-dt);
+  state.burstCooldown=Math.max(0,state.burstCooldown-dt);
+  state.magicPulse=Math.max(0,state.magicPulse-dt);
+  if(state.started&&!state.inDialogue&&state.player.mp<state.player.maxMp) state.player.mp=Math.min(state.player.maxMp,state.player.mp+dt*1.2);
+  updateMagicUi();
   if(beast&&!questDone("merchant")){ beast.position.x=2.0+Math.sin(t*4.2)*.25; beast.position.y=.05+Math.abs(Math.sin(t*5.2))*.08; beast.rotation.z=Math.sin(t*6)*.1; }
   if(caravan&&!questDone("merchant")) caravan.rotation.z=Math.sin(t*2.6)*.018;
   for(let i=projectiles.length-1;i>=0;i--){
@@ -533,13 +739,28 @@ function updateEffects(dt,t){
     } else {
       p.mesh.position.addScaledVector(p.dir,p.speed*dt);
       p.mesh.scale.setScalar(1+Math.sin(t*18)*.18);
-      if(beast){ const bp=new THREE.Vector3(); beast.getWorldPosition(bp); if(p.mesh.position.distanceTo(bp)<1.2) projectileHit(p,i); }
+      if(colliderAt(p.mesh.position.x,p.mesh.position.z,p.mode==="burst"?.36:.22,true) && p.mesh.position.distanceTo(p.start)>1.2) projectileHit(p,i);
+      else if(beast){ const bp=new THREE.Vector3(); beast.getWorldPosition(bp); if(p.mesh.position.distanceTo(bp)<1.2) projectileHit(p,i); }
       if(p.life<=0 || p.mesh.position.distanceTo(player.position)>100) projectileHit(p,i,false);
     }
   }
-  for(let i=bursts.length-1;i>=0;i--){ const b=bursts[i]; b.life-=dt; b.group.scale.setScalar(1+(1-b.life/b.max)*2.2); b.group.children.forEach(s=>s.position.addScaledVector(s.userData.vel,dt)); if(b.life<=0){ world.remove(b.group); bursts.splice(i,1); } }
+  for(let i=bursts.length-1;i>=0;i--){
+    const b=bursts[i]; b.life-=dt;
+    const k=1-b.life/b.max; b.group.scale.setScalar(1+k*2.2);
+    b.group.children.forEach(s=>{ if(s.userData?.vel) s.position.addScaledVector(s.userData.vel,dt); });
+    if(b.light) b.light.intensity=Math.max(0,5.5*(b.life/b.max));
+    if(b.life<=0){ world.remove(b.group); bursts.splice(i,1); }
+  }
 }
-function projectileHit(p,i,explode=true){ if(explode) createBurst(p.mesh.position.clone()); world.remove(p.mesh); projectiles.splice(i,1); if(beast&&explode){ beast.rotation.z=-.45; beast.position.y+=.15; } }
+function projectileHit(p,i,explode=true){
+  if(explode){
+    createBurst(p.mesh.position.clone(),p.mode==="burst"?0xffc46b:0xff7a1c);
+    state.cameraShake=Math.max(state.cameraShake,p.mode==="burst"?.18:.11);
+    state.hitStop=Math.max(state.hitStop,p.mode==="burst"?.075:.045);
+  }
+  world.remove(p.mesh); projectiles.splice(i,1);
+  if(beast&&explode){ beast.rotation.z=-.45; beast.position.y+=.15; }
+}
 
 function addNpc(npc){
   const n=createPerson(npc); n.position.set(npc.position.x,0,npc.position.z); n.userData={...npc,kind:"npc"};
@@ -547,42 +768,80 @@ function addNpc(npc){
   scene.add(n); npcs.push(n);
 }
 function createPlayer(){ return createPerson({ id:"player", variant:"player", color:0x24395d }); }
+function personProfile(v, base){
+  const profiles={
+    player:{cloth:base||0x24395d, cape:0x1b2740, hair:0x24202a, leg:0x252d3c, boots:0x39281c, style:"short"},
+    receptionist:{cloth:0x385f73, cape:0xf1dbc5, hair:0xf1dbc5, leg:0x2f4652, boots:0x4b3422, style:"bun"},
+    merchant:{cloth:0x8c6a42, cape:0xb68d55, hair:0x4d3424, leg:0x403126, boots:0x2d1d14, style:"short"},
+    traveler:{cloth:base||0x7f9fbd, cape:0x5d4b39, hair:0x3a2a1d, leg:0x33404a, boots:0x39281c, style:"short"},
+    commoner:{cloth:base||0x7f9fbd, cape:0x6d5d4a, hair:0x3a2a1d, leg:0x3d3b34, boots:0x39281c, style:"bob"},
+    guard:{cloth:0xb77954, cape:0x4d5661, hair:0x2e2218, leg:0x2f3541, boots:0x211711, style:"helmet"},
+    priest:{cloth:0xcfc8b4, cape:0xd5cfbc, hair:0xd5cfbc, leg:0xc7c2b1, boots:0x3a3128, style:"hood", robe:true},
+    pilgrim:{cloth:0xb8ad91, cape:0x8c8068, hair:0x7b5b3f, leg:0x5d5140, boots:0x3a3128, style:"hood"},
+    shady:{cloth:0x272331, cape:0x15131b, hair:0x18151c, leg:0x1f1c24, boots:0x111015, style:"hood"},
+    veteran:{cloth:base||0x8c6f4f, cape:0x5a3d27, hair:0x7b5b3f, leg:0x2f3541, boots:0x2a1b10, style:"short"},
+    adventurer:{cloth:base||0x4d6388, cape:0x38344a, hair:0x5b3a24, leg:0x2f3541, boots:0x2a1b10, style:"short"},
+    guild_guide:{cloth:base||0xd8b36b, cape:0x4a3825, hair:0x3a2a1d, leg:0x2f3541, boots:0x39281c, style:"short"},
+    blacksmith:{cloth:0x6c5a4a, cape:0x2b2520, hair:0x2e2218, leg:0x34302a, boots:0x20140f, style:"short"}
+  };
+  return profiles[v] || profiles.traveler;
+}
 function createPerson(n){
-  const g=new THREE.Group(), v=n.variant||n.id, base=n.color;
-  const skin=0xd8ad84, hair=v==="receptionist"?0xf1dbc5:v==="priest"?0xd5cfbc:v==="veteran"?0x7b5b3f:0x2e2218;
-  body(g,base,v==="priest"?0xcfc8b4:null);
-  head(g,skin,hair,v==="receptionist"?"bun":v==="priest"?"hood":"short");
-  limbs(g,base,v==="priest"?0xc7c2b1:0x252d3c,0x39281c,skin);
-  if(v==="guard"){ placeBox(0,1,.28,.62,.58,.18,0xa8acb6,"",g); const spear=placeCylinder(-.42,1.05,0,.03,2.2,0x6e5134,"",g); spear.rotation.z=.1; }
-  if(v==="receptionist") placeBox(0,.78,.25,.45,.6,.12,0xf1dbc5,"",g);
-  if(v==="priest") [-.12,.12].forEach(x=>placeBox(x,.9,.23,.12,.96,.14,0xd5c089,"",g));
-  if(v==="guild_guide"){ const sash=placeBox(.18,.92,.23,.15,.92,.14,0xd8b36b,"",g); sash.rotation.z=-.5; }
+  const g=new THREE.Group(), v=n.variant||n.id, p=personProfile(v,n.color), skin=0xd8ad84;
+  body(g,p.cloth,p);
+  head(g,skin,p.hair,p.style);
+  limbs(g,p.cloth,p.leg,p.boots,skin);
+  addRoleDetails(g,v,p,skin);
+  g.userData.modelKind="primitive-person";
   return g;
 }
-function body(g,color,robe){
+function body(g,color,p){
   placeBox(0,1.02,0,.74,.92,.38,color,"",g);
-  if(robe){ const rb=add(new THREE.ConeGeometry(.5,.95,6),mat(robe),g); rb.position.set(0,.55,-.03); rb.rotation.x=Math.PI; }
-  else { const cape=placeBox(0,.86,-.31,.62,.55,.12,0x1b2740,"",g); cape.rotation.x=.12; }
-  placeBox(0,.74,0,.82,.11,.46,0x8c6740,"",g);
+  if(p.robe){ const rb=add(new THREE.ConeGeometry(.53,.98,6),mat(p.cape),g); rb.position.set(0,.55,-.03); rb.rotation.x=Math.PI; }
+  else { const cape=placeBox(0,.88,-.33,.66,.62,.12,p.cape,"",g); cape.rotation.x=.12; }
+  placeBox(0,.74,0,.84,.12,.48,0x8c6740,"",g);
+  placeBox(.28,.76,.25,.16,.16,.08,0xd8b36b,"",g);
 }
 function head(g,skin,hair,style){
   placeCylinder(0,1.49,0,.08,.14,skin,"",g);
   add(new THREE.SphereGeometry(.29,20,16),mat(skin),g).position.set(0,1.78,0);
   [[-.1,1.8,.285],[.1,1.8,.285]].forEach(p=>placeBox(p[0],p[1],p[2],.055,.035,.018,0x17223a,"",g));
-  if(style==="hood"){ const h=add(new THREE.SphereGeometry(.36,16,12),mat(hair),g); h.scale.set(1.04,.9,1.06); h.position.set(0,1.82,-.04); }
-  else {
-    const cap=add(new THREE.SphereGeometry(.335,18,12),mat(hair),g); cap.scale.set(1.05,.54,1.03); cap.position.set(0,1.95,-.035);
-    [-.17,0,.17].forEach((x,i)=>{ const bang=placeBox(x,1.87,.295,.11,.24,.055,hair,"",g); bang.rotation.z=(i-1)*.18; });
-    if(style==="bun") add(new THREE.SphereGeometry(.16,12,10),mat(hair),g).position.set(0,1.95,-.28);
-  }
   placeBox(0,1.755,.305,.05,.08,.05,skin,"",g);
+  if(style==="hood"){ const h=add(new THREE.SphereGeometry(.37,16,12),mat(hair),g); h.scale.set(1.06,.93,1.08); h.position.set(0,1.82,-.04); placeBox(0,1.72,.32,.32,.12,.06,0x111015,"",g); return; }
+  if(style==="helmet"){
+    const helm=add(new THREE.SphereGeometry(.335,16,12),mat(0xa8acb6),g); helm.scale.set(1.08,.62,1.04); helm.position.set(0,1.95,-.035);
+    placeBox(0,1.82,.31,.42,.14,.06,0x7f8791,"",g);
+    return;
+  }
+  const cap=add(new THREE.SphereGeometry(.335,18,12),mat(hair),g); cap.scale.set(1.05,.54,1.03); cap.position.set(0,1.95,-.035);
+  [-.19,-.06,.07,.2].forEach((x,i)=>{ const bang=placeBox(x,1.87,.295,.1,.24,.055,hair,"",g); bang.rotation.z=(i-1.5)*.12; });
+  if(style==="bun") add(new THREE.SphereGeometry(.16,12,10),mat(hair),g).position.set(0,1.95,-.28);
+  if(style==="bob") placeBox(0,1.8,-.22,.48,.34,.12,hair,"",g);
 }
 function limbs(g,sleeve,leg,boot,skin){
-  [-1,1].forEach(s=>{ const a=placeBox(s*.46,1.05,0,.17,.52,.17,sleeve,"",g); a.rotation.z=s*.16; add(new THREE.SphereGeometry(.085,10,8),mat(skin),g).position.set(s*.52,.72,.03); placeBox(s*.15,.38,0,.19,.62,.19,leg,"",g); placeBox(s*.15,.07,.08,.22,.16,.34,boot,"",g); });
+  [-1,1].forEach(s=>{
+    const a=placeBox(s*.46,1.05,0,.17,.54,.17,sleeve,"",g); a.rotation.z=s*.16;
+    add(new THREE.SphereGeometry(.085,10,8),mat(skin),g).position.set(s*.52,.72,.03);
+    placeBox(s*.15,.38,0,.19,.64,.19,leg,"",g);
+    placeBox(s*.15,.07,.08,.24,.16,.36,boot,"",g);
+  });
+}
+function addRoleDetails(g,v,p,skin){
+  if(v==="guard"){ placeBox(0,1,.29,.64,.6,.18,0xa8acb6,"",g); const spear=placeCylinder(-.46,1.06,0,.03,2.3,0x6e5134,"",g); spear.rotation.z=.12; placeBox(.42,1.03,.3,.22,.78,.1,0x7f8791,"",g); }
+  if(v==="receptionist") placeBox(0,.78,.27,.48,.62,.12,0xf1dbc5,"",g);
+  if(v==="priest"||v==="pilgrim") [-.12,.12].forEach(x=>placeBox(x,.9,.24,.12,.96,.14,0xd5c089,"",g));
+  if(v==="guild_guide"){ const sash=placeBox(.18,.92,.25,.15,.94,.14,0xd8b36b,"",g); sash.rotation.z=-.5; }
+  if(v==="merchant") { placeBox(.38,.96,.25,.24,.34,.14,0xd8b36b,"",g); addSack(-.42,.74,.18,g); }
+  if(v==="adventurer"||v==="veteran"){ placeBox(-.44,1.02,.28,.16,.78,.1,0x8a8f98,"",g); const sword=placeBox(.5,.86,-.22,.08,.8,.08,0xb7c0c7,"",g); sword.rotation.z=-.65; }
+  if(v==="blacksmith"){ placeBox(0,.95,.28,.58,.58,.12,0x2b2520,"",g); placeBox(.52,.78,.05,.16,.62,.12,0x8a8f98,"",g); }
+  if(v==="shady"){ placeBox(0,1.4,.32,.44,.12,.08,0x0d0b10,"",g); }
 }
 
+
 function loop(){
-  const dt=Math.min(clock.getDelta(),.05), t=clock.elapsedTime;
+  const rawDt=Math.min(clock.getDelta(),.05), t=clock.elapsedTime;
+  const dt=state.hitStop>0?0:rawDt;
+  state.hitStop=Math.max(0,state.hitStop-rawDt);
   viewKeys(dt); gamepad(dt); move(dt); updateMovers(dt); updateEffects(dt,t);
   npcs.forEach((n,i)=>{ if(!movers.some(m=>m.object===n)){ n.position.y=Math.sin(t*1.6+i*.8)*.02; n.rotation.y=Math.sin(t*.6+i)*.12; } });
   detect(); cameraUpdate(); renderer.render(scene,camera); requestAnimationFrame(loop);
@@ -649,6 +908,7 @@ function tryMove(dx,dz,dy){
   const nz=THREE.MathUtils.clamp(player.position.z+dz,bounds.minZ,bounds.maxZ);
   if(state.debug || !isBlocked(player.position.x,nz)) player.position.z=nz;
   player.position.y=state.debug?THREE.MathUtils.clamp(player.position.y+dy,0,90):0;
+  resolveDynamicContacts();
 }
 function regen(dt,a){ state.player.stamina=Math.min(state.player.maxStamina,state.player.stamina+a*dt); staminaText(); }
 function staminaText(){ if(ui.stat.stamina) ui.stat.stamina.textContent=`${Math.round(state.player.stamina)}/${state.player.maxStamina}`; }
@@ -661,18 +921,26 @@ function detect(){
   else{state.activeTarget=null;ui.hint.classList.add("is-hidden");}
 }
 function cameraUpdate(){
-  const desired=state.isDashing?(state.cameraMode==="first"?72:63):55;
+  const desired=state.cameraMode==="first"?(state.isDashing?76:68):(state.isDashing?63:55);
   camera.fov+=(desired-camera.fov)*.12; camera.updateProjectionMatrix();
   const target=new THREE.Vector3(player.position.x,player.position.y+1.08,player.position.z);
   if(state.cameraMode==="first"){
-    const eye=new THREE.Vector3(player.position.x,player.position.y+1.55,player.position.z);
-    const look=new THREE.Vector3(-Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),-Math.cos(state.yaw)*Math.cos(state.pitch));
-    camera.position.lerp(eye,.45); camera.lookAt(eye.clone().add(look)); player.visible=false; return;
+    const eye=new THREE.Vector3(player.position.x,player.position.y+1.6,player.position.z);
+    const look=aimDirection();
+    camera.position.lerp(eye,.58); camera.lookAt(eye.clone().add(look)); player.visible=false; applyCameraShake(); return;
   }
   player.visible=true;
   const radius=state.map==="plaza"?12.5:8.8, base=state.map==="plaza"?7.2:5.8;
   const off=new THREE.Vector3(Math.sin(state.yaw)*radius,base+Math.sin(state.pitch)*5,Math.cos(state.yaw)*radius);
   camera.position.lerp(target.clone().add(off),.12); camera.lookAt(target);
+  applyCameraShake();
+}
+function applyCameraShake(){
+  if(state.cameraShake<=0) return;
+  const power=state.cameraShake;
+  camera.position.x += rand(-power,power);
+  camera.position.y += rand(-power,power)*.65;
+  state.cameraShake=Math.max(0,state.cameraShake*.84-.002);
 }
 function toggleCamera(){ state.cameraMode=state.cameraMode==="third"?"first":"third"; }
 function toggleDebug(){ state.debug=!state.debug; updateHud(); }
@@ -719,7 +987,12 @@ function setObjective(t){ data.objective=t; ui.objective.textContent=t; }
 function markDone(ids){ ids.forEach(id=>{ const q=state.quest.find(x=>x.id===id); if(q)q.done=true; }); if(ids.includes("merchant")) resolveCaravan(); renderQuests(); }
 function resolveCaravan(){ if(beast) beast.visible=false; if(merchant){ merchant.rotation.set(0,Math.PI,0); merchant.position.set(.78,.06,1.55); } }
 function setDeep(path,val){ const ks=path.split("."); let t=state; while(ks.length>1){ const k=ks.shift(); t[k]??={}; t=t[k]; } t[ks[0]]=val; }
-function updateHud(){ const m=data.maps[state.map]; ui.stat.name.textContent=state.player.name; ui.stat.hp.textContent=`${state.player.hp}/${state.player.maxHp}`; ui.stat.mp.textContent=`${state.player.mp}/${state.player.maxMp}`; staminaText(); ui.stat.rank.textContent=state.player.rank; ui.stat.contract.textContent=state.player.contract; ui.objective.textContent=(state.debug?"[DEBUG FLY] ":"")+(data.objective||""); ui.area.textContent=m.name; ui.map.textContent=m.minimap; renderQuests(); }
+function updateHud(){ const m=data.maps[state.map]; ui.stat.name.textContent=state.player.name; ui.stat.hp.textContent=`${Math.round(state.player.hp)}/${state.player.maxHp}`; ui.stat.mp.textContent=`${Math.floor(state.player.mp)}/${state.player.maxMp}`; staminaText(); ui.stat.rank.textContent=state.player.rank; ui.stat.contract.textContent=state.player.contract; ui.objective.textContent=(state.debug?"[DEBUG FLY] ":"")+(data.objective||""); ui.area.textContent=m.name; ui.map.textContent=m.minimap; renderQuests(); updateMagicUi(); }
+function updateMagicUi(){
+  if(ui.stat.mp) ui.stat.mp.textContent=`${Math.floor(state.player.mp)}/${state.player.maxMp}`;
+  if(ui.cooldowns.fire) ui.cooldowns.fire.value=state.fireMaxCooldown?1-state.fireCooldown/state.fireMaxCooldown:1;
+  if(ui.cooldowns.burst) ui.cooldowns.burst.value=state.burstMaxCooldown?1-state.burstCooldown/state.burstMaxCooldown:1;
+}
 function renderQuests(){ ui.quests.innerHTML=""; state.quest.forEach(q=>{ const li=document.createElement("li"); li.textContent=q.text; if(q.done)li.classList.add("done"); ui.quests.appendChild(li); }); }
 function createLabel(text){
   const c=document.createElement("canvas"),x=c.getContext("2d"); c.width=512;c.height=128;

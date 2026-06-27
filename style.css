@@ -122,6 +122,29 @@ h2 {
 }
 .mini-map pre { margin: 0; color: rgba(246,239,225,.70); font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
+.combat-ui {
+  position: fixed;
+  z-index: 5;
+  right: 18px;
+  bottom: 78px;
+  width: 230px;
+  display: grid;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 14px;
+  background: rgba(5,7,11,.68);
+  box-shadow: 0 12px 30px rgba(0,0,0,.26);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+.spell-row { display: grid; grid-template-columns: 74px 1fr; align-items: center; gap: 8px; }
+.spell-row span { color: rgba(246,239,225,.78); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.spell-row meter { width: 100%; height: 9px; }
+.spell-row meter::-webkit-meter-bar { border: 0; border-radius: 999px; background: rgba(255,255,255,.12); }
+.spell-row meter::-webkit-meter-optimum-value { border-radius: 999px; background: linear-gradient(90deg, #ff7a1c, #ffd06b); }
+.spell-row meter::-moz-meter-bar { border-radius: 999px; background: linear-gradient(90deg, #ff7a1c, #ffd06b); }
+
 .interact-hint {
   position: fixed;
   z-index: 6;
@@ -221,5 +244,6 @@ button:hover, button:focus-visible { background: rgba(216,179,107,.18); outline:
   .mini-map { display: none; }
   .dialogue { left: 12px; right: 12px; bottom: 12px; min-height: 220px; padding: 16px; }
   .interact-hint { bottom: 250px; }
+  .combat-ui { right: 12px; bottom: 12px; width: min(230px, calc(100vw - 24px)); }
   .help { display: none; }
 }

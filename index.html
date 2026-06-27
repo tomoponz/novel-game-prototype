@@ -3,49 +3,48 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>漆黒の翼 Web Novel Prototype</title>
+  <title>Novel RPG Prototype</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main id="app" class="app">
-    <section id="stage" class="stage" aria-label="ゲーム画面">
-      <div class="visuals" aria-hidden="true">
-        <img id="bg-image" class="bg-image" alt="">
-        <img id="character-image" class="character-image is-hidden" data-position="center" alt="">
-      </div>
-      <div class="vignette"></div>
+  <main id="app">
+    <canvas id="game-canvas" aria-label="3D探索画面"></canvas>
 
-      <div class="topbar">
-        <div>
-          <p class="label">現在の場面</p>
-          <h1 id="scene-title">Loading...</h1>
-        </div>
-        <div class="controls" aria-label="操作ボタン">
-          <button id="save-btn" type="button">Save</button>
-          <button id="load-btn" type="button">Load</button>
-          <button id="reset-btn" type="button">Reset</button>
-        </div>
+    <section class="hud" aria-label="HUD">
+      <div>
+        <p class="label">OBJECTIVE</p>
+        <h1 id="objective">ギルドの場所を探す</h1>
       </div>
-
-      <aside class="status" aria-label="ステータス">
+      <div class="status">
         <div><span>NAME</span><strong id="stat-name"></strong></div>
         <div><span>HP</span><strong id="stat-hp"></strong></div>
         <div><span>MP</span><strong id="stat-mp"></strong></div>
         <div><span>RANK</span><strong id="stat-rank"></strong></div>
         <div><span>CONTRACT</span><strong id="stat-contract"></strong></div>
-      </aside>
-
-      <section class="textbox" aria-live="polite">
-        <div id="backlog" class="backlog"></div>
-        <p id="speaker" class="speaker"></p>
-        <p id="line" class="line"></p>
-        <div id="choices" class="choices"></div>
-        <p class="hint">クリック / Enter / Space：次へ　Esc：セーブ</p>
-      </section>
+      </div>
     </section>
+
+    <aside id="interact-hint" class="interact-hint is-hidden">
+      <kbd>E</kbd> 話す
+    </aside>
+
+    <section id="dialogue" class="dialogue is-hidden" aria-live="polite">
+      <p id="speaker" class="speaker"></p>
+      <p id="line" class="line"></p>
+      <div id="choices" class="choices"></div>
+      <p class="hint">Enter / Space：次へ　Esc：閉じる</p>
+    </section>
+
+    <section class="help">
+      <span>WASD / 矢印：移動</span>
+      <span>E：会話</span>
+      <span>マウスドラッグ：視点回転</span>
+    </section>
+
+    <div id="loading" class="loading">3D広場を生成中...</div>
   </main>
 
   <script src="story.js"></script>
-  <script src="game.js"></script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>

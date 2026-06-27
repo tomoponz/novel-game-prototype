@@ -1,83 +1,52 @@
-# 漆黒の翼 Web Novel Prototype
+# Novel Game Prototype
 
-アップロードされた創作資料から、まずは本文をブラウザで読めるノベルゲーム形式にした最小プロトタイプです。
+ブラウザで動く3D探索型ノベルRPGの試作です。
 
-## できること
+## 現在できること
 
-- 第一話〜第四話をクリック/Enter/Spaceで読み進める
-- 章末に簡単な選択肢を表示する
-- HP/MP/RANK/CONTRACTのステータス欄を表示する
-- ローカル保存/読込を行う
-- GitHub Pagesでそのまま公開できる
-- 背景画像・立ち絵を場面ごとに表示できる
+- 小さな3Dの王都中央広場を表示
+- WASD / 矢印キーで移動
+- マウスドラッグで視点回転
+- NPCに近づくと話しかける案内を表示
+- Eキーでノベル風会話UIを表示
+- 会話の選択肢でステータスを変化
+- GitHub Pagesで公開
+
+## 操作
+
+| 操作 | 内容 |
+|---|---|
+| W / A / S / D | 移動 |
+| 矢印キー | 移動 |
+| マウスドラッグ | 視点回転 |
+| E | 近くのNPCに話しかける |
+| Enter / Space | 会話を進める |
+| Esc | 会話を閉じる |
 
 ## ファイル構成
 
 ```text
 .
-├── index.html      # 画面構造
-├── style.css       # 見た目
-├── game.js         # 進行・セーブ・選択肢・画像表示処理
-├── story.js        # 本文・分岐・ステータス初期値
+├── index.html      # 3Dゲーム画面
+├── style.css       # HUD・会話ウィンドウ
+├── game.js         # Three.jsによる3D探索処理
+├── story.js        # NPC会話・選択肢・ステータス
+├── THREE_PROTOTYPE.md
 └── assets/
-    ├── bg/         # 背景画像を入れる場所
-    ├── chara/      # 立ち絵を入れる場所
-    ├── bgm/        # BGMを入れる場所
-    └── se/         # 効果音を入れる場所
+    ├── models/     # 将来の3Dモデル置き場
+    ├── textures/   # 将来のテクスチャ置き場
+    ├── bgm/        # BGM置き場
+    └── se/         # 効果音置き場
 ```
 
-## GitHub Pagesで公開する手順
+## 次に追加したいこと
 
-1. GitHubで新しいリポジトリを作る。例：`shikkoku-web-novel`
-2. このフォルダの中身をリポジトリ直下にアップロードする。
-3. GitHubのリポジトリ画面で `Settings` → `Pages` を開く。
-4. `Build and deployment` の Source を `Deploy from a branch` にする。
-5. Branch を `main`、Folder を `/root` にして保存する。
-6. 数十秒〜数分後に `https://ユーザー名.github.io/リポジトリ名/` で開ける。
-
-## 本文や分岐を編集する場所
-
-`story.js` の `scenes` を編集します。
-
-```js
-"new_scene": {
-  title: "新しい場面",
-  speaker: "ユウジ",
-  bg: "city-stone",
-  bgImage: "assets/bg/city_street.png",
-  characterImage: "assets/chara/yuji_normal.png",
-  characterPosition: "right",
-  lines: [
-    "ここに本文を書く。",
-    "クリックすると次の文に進む。"
-  ],
-  choices: [
-    { text: "次へ", to: "next_scene" }
-  ]
-}
-```
-
-### 使える画像項目
-
-- `bgImage`: 背景画像のパス
-- `characterImage`: 立ち絵画像のパス
-- `characterAlt`: 画像の補助テキスト
-- `characterPosition`: `left` / `center` / `right`
-
-選択肢でステータスを変える例：
-
-```js
-{ text: "慎重に質問する", to: "next_scene", stat: { knowledge: 1, caution: 1 } }
-```
-
-## 次に追加するとよい機能
-
-- 背景画像：`assets/bg` に画像を置く
-- 立ち絵：`assets/chara` に画像を置く
-- BGM/SE：クリック時、戦闘時、通知時に再生
-- 戦闘風UI：HP/MPを選択肢で増減させる
-- 章ごとのファイル分割：長くなったら `story_chapter1.js` のように分ける
+- 建物の見た目を改善する
+- NPCを増やす
+- ギルド内マップを追加する
+- クエスト管理を追加する
+- 画像・3Dモデル・BGMを追加する
 
 ## 注意
 
-GitHub Pagesで公開すると、HTML/JS内の本文は閲覧者から見えます。公開前の創作本文を守りたい場合は、まずPrivateリポジトリで管理し、公開する範囲だけをPagesに出す方が安全です。
+この試作はCDNからThree.jsを読み込みます。インターネット接続がない環境では動きません。

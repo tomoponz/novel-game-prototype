@@ -14,7 +14,7 @@
       <div class="title-card">
         <p class="label">3D EXPLORATION NOVEL RPG</p>
         <h1>Novel RPG Prototype</h1>
-        <p class="title-copy">異世界の石畳で目覚め、ギルド登録のために街を歩く。</p>
+        <p class="title-copy">森の街道で目覚め、荷車襲撃を越えて王都アウレリアへ入る。</p>
         <button id="start-btn" class="primary-button" type="button">Start</button>
       </div>
     </section>
@@ -22,8 +22,8 @@
     <section class="hud" aria-label="HUD">
       <div class="objective-box">
         <p class="label">OBJECTIVE</p>
-        <h2 id="objective">ギルドの場所を探す</h2>
-        <p id="area-name" class="area-name">王都中央広場</p>
+        <h2 id="objective">王都へ続く森の道で状況を把握する</h2>
+        <p id="area-name" class="area-name">王都へ続く森の街道</p>
       </div>
 
       <div class="right-panels">
@@ -55,19 +55,22 @@
       <p id="speaker" class="speaker"></p>
       <p id="line" class="line"></p>
       <div id="choices" class="choices"></div>
-      <p class="hint">Enter / Space：次へ　Esc：閉じる　DualShock 4：×で進む / ○で閉じる</p>
+      <p class="hint">Enter / Space：次へ　Esc：閉じる　DS4：上下で選択 / ×で決定 / ○で閉じる</p>
     </section>
 
     <section class="help">
       <span>WASD：移動</span>
-      <span>Shift：ダッシュ</span>
-      <span>矢印キー：視点</span>
-      <span>F：1人称/3人称</span>
-      <span>E：会話・入る</span>
-      <span>DS4：左スティック移動 / 右スティック視点 / R2ダッシュ / ×会話 / △視点切替</span>
+      <span>Shift / R2：ダッシュ</span>
+      <span>矢印キー / 右スティック：視点</span>
+      <span>F / OPTIONS：1人称/3人称</span>
+      <span>E / ×：会話・入る</span>
+      <span>J / □：火球</span>
+      <span>K / ○：回避</span>
+      <span>L / △：強火球</span>
+      <span>F3/`：Debug Fly</span>
     </section>
 
-    <div id="loading" class="loading">3D広場を生成中...</div>
+    <div id="loading" class="loading">王国マップを生成中...</div>
   </main>
 
   <script src="story.js"></script>

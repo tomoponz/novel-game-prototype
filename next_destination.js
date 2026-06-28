@@ -67,6 +67,23 @@
     try {
       const get = window.__AURELIA_MINIMAP__;
       if (typeof get === "function") return get();
+      const debug = window.__AURELIA_DEBUG__;
+      const state = debug?.state;
+      const peek = debug?.peek?.();
+      const cam = peek?.cam;
+      if (!state || !cam) return null;
+      const yaw = state.yaw || 0;
+      const pitch = state.pitch || 0;
+      if (state.cameraMode === "first") return { map: state.map, x: cam[0], z: cam[2], yaw };
+      const radius = state.map === "plaza" ? 18 : 8.8;
+      return {
+        map: state.map,
+        x: cam[0] - Math.sin(yaw) * radius,
+        z: cam[2] - Math.cos(yaw) * radius,
+        yaw,
+        approx: true,
+        pitch
+      };
     } catch {}
     return null;
   }
@@ -115,7 +132,7 @@
     ctx.fillStyle = "rgba(246,239,225,.78)";
     ctx.font = "10px ui-monospace, Consolas, monospace";
     ctx.fillText(bounds.label || info.map, 10, 14);
-    if (caption) caption.textContent = `${info.map}  x:${info.x.toFixed(0)} z:${info.z.toFixed(0)}`;
+    if (caption) caption.textContent = `${info.map}  x:${info.x.toFixed(0)} z:${info.z.toFixed(0)}${info.approx ? " approx" : ""}`;
   }
 
   function drawGrid(ctx, w, h) {

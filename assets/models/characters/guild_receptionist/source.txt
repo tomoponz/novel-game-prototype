@@ -1,0 +1,28 @@
+Guild receptionist runtime model
+
+This folder contains a lightweight runtime composition for the guild receptionist.
+It is built from Quaternius CC0 source assets already included in this repository.
+
+Runtime files:
+
+- base.gltf / base.bin
+- outfit.gltf / outfit.bin
+- hair.gltf / hair.bin
+
+Source files:
+
+- assets/models/Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Female_FullBody.gltf
+- assets/models/Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Female_FullBody.bin
+- assets/models/Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Peasant.gltf
+- assets/models/Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Peasant.bin
+- assets/models/Universal Base Characters[Standard]/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)/Hair_SimpleParted.gltf
+- assets/models/Universal Base Characters[Standard]/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)/Hair_SimpleParted.bin
+
+Notes:
+
+- The runtime glTF files keep the original geometry and skin structure, but use
+  simple PBR material colors instead of the large source textures.
+- The outfit kit readme recommends keeping only the base character head when
+  using clothing. This runtime version still overlays the full base body under
+  the peasant outfit, so a future Blender-authored GLB should remove hidden body
+  parts for a cleaner final asset.

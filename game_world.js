@@ -180,6 +180,7 @@ let colliders = [], locations = [], npcs = [], movers = [], cullables = [], proj
 let colliderGrid = new Map();
 let facadeSpecs = [], plainSpecs = [], shopAnchors = [];
 let sunLight, hemiLight, ambLight;
+let timeTransition = null;
 const GRID_SIZE = 18;
 const DAYPHASES = {
   morning: { sky: 0xb9c8d8, fog: [120, 1400], sun: 2.1, sunCol: 0xffe2c4, hemi: 1.7, amb: .5, ambCol: 0x57606e, label: "朝" },
@@ -252,8 +253,61 @@ function bindQualitySelect() {
 }
 function bindStartEarly() { const start = () => { if (state.started) return; audio.enable(); audio.play("ui_decide"); state.started = true; ui.title?.classList.add("is-hidden"); ui.loading?.classList.remove("is-hidden"); setTimeout(() => { const map = params.get("map") || data.startMap || "forestRoad"; loadMap(map, initialSpawn(map)); state.loaded = true; ui.loading?.classList.add("is-hidden"); }, 30); }; ui.start?.addEventListener("click", start); ui.start?.addEventListener("pointerup", (e) => { e.preventDefault(); start(); }); }
 function initLights() { hemiLight = new THREE.HemisphereLight(0xf0e6cf, 0x415063, 1.95); scene.add(hemiLight); sunLight = new THREE.DirectionalLight(0xfff1d6, 2.55); sunLight.position.set(90, 135, 70); sunLight.castShadow = quality.shadow; sunLight.shadow.mapSize.set(1536, 1536); sunLight.shadow.bias = -0.0004; Object.assign(sunLight.shadow.camera, { near: .5, far: 620, left: -390, right: 390, top: 390, bottom: -390 }); scene.add(sunLight); ambLight = new THREE.AmbientLight(0x556070, .5); scene.add(ambLight); }
-function applyTimeOfDay() { const p = DAYPHASES[state.timeOfDay] || DAYPHASES.day; if (sunLight) { sunLight.intensity = p.sun; sunLight.color.setHex(p.sunCol); } if (hemiLight) hemiLight.intensity = p.hemi; if (ambLight) { ambLight.intensity = p.amb; ambLight.color.setHex(p.ambCol); } if (state.map === "plaza" || state.map === "forestRoad" || state.map === "trainingGround") setEnv(p.sky, p.fog[0], p.fog[1]); }
-function setTimeOfDay(phase) { state.timeOfDay = phase; applyTimeOfDay(); updateHud(); }
+function isOutdoorMap() { return state.map === "plaza" || state.map === "forestRoad" || state.map === "trainingGround"; }
+function phaseSnapshot(phase) {
+  const p = DAYPHASES[phase] || DAYPHASES.day;
+  return { sky: new THREE.Color(p.sky), fogNear: p.fog[0], fogFar: p.fog[1], sun: p.sun, sunCol: new THREE.Color(p.sunCol), hemi: p.hemi, amb: p.amb, ambCol: new THREE.Color(p.ambCol) };
+}
+function currentTimeSnapshot() {
+  const p = phaseSnapshot(state.timeOfDay);
+  return {
+    sky: scene.background?.isColor ? scene.background.clone() : p.sky.clone(),
+    fogNear: scene.fog?.near ?? p.fogNear,
+    fogFar: scene.fog?.far ?? p.fogFar,
+    sun: sunLight?.intensity ?? p.sun,
+    sunCol: sunLight?.color?.clone?.() || p.sunCol.clone(),
+    hemi: hemiLight?.intensity ?? p.hemi,
+    amb: ambLight?.intensity ?? p.amb,
+    ambCol: ambLight?.color?.clone?.() || p.ambCol.clone()
+  };
+}
+function applyTimeSnapshot(s) {
+  if (sunLight) { sunLight.intensity = s.sun; sunLight.color.copy(s.sunCol); }
+  if (hemiLight) hemiLight.intensity = s.hemi;
+  if (ambLight) { ambLight.intensity = s.amb; ambLight.color.copy(s.ambCol); }
+  if (isOutdoorMap()) {
+    if (!scene.background?.isColor) scene.background = s.sky.clone();
+    else scene.background.copy(s.sky);
+    if (!scene.fog) scene.fog = new THREE.Fog(s.sky, s.fogNear, s.fogFar);
+    else { scene.fog.color.copy(s.sky); scene.fog.near = s.fogNear; scene.fog.far = s.fogFar; }
+  }
+}
+function applyTimeOfDay() { timeTransition = null; applyTimeSnapshot(phaseSnapshot(state.timeOfDay)); }
+function transitionTimeOfDay(phase, duration = 4) {
+  if (!DAYPHASES[phase]) phase = "day";
+  state.timeOfDay = phase;
+  timeTransition = { from: currentTimeSnapshot(), to: phaseSnapshot(phase), t: 0, d: Math.max(.1, duration) };
+  updateHud();
+}
+function updateTimeTransition(dt) {
+  if (!timeTransition) return;
+  timeTransition.t += dt;
+  const k = Math.min(1, timeTransition.t / timeTransition.d);
+  const e = k * k * (3 - 2 * k);
+  const a = timeTransition.from, b = timeTransition.to;
+  applyTimeSnapshot({
+    sky: a.sky.clone().lerp(b.sky, e),
+    fogNear: THREE.MathUtils.lerp(a.fogNear, b.fogNear, e),
+    fogFar: THREE.MathUtils.lerp(a.fogFar, b.fogFar, e),
+    sun: THREE.MathUtils.lerp(a.sun, b.sun, e),
+    sunCol: a.sunCol.clone().lerp(b.sunCol, e),
+    hemi: THREE.MathUtils.lerp(a.hemi, b.hemi, e),
+    amb: THREE.MathUtils.lerp(a.amb, b.amb, e),
+    ambCol: a.ambCol.clone().lerp(b.ambCol, e)
+  });
+  if (k >= 1) timeTransition = null;
+}
+function setTimeOfDay(phase, instant = false) { if (instant) { state.timeOfDay = phase; applyTimeOfDay(); updateHud(); } else transitionTimeOfDay(phase); }
 function initialSpawn(map) { return ({ forestRoad: { x: 0, z: 74 }, plaza: { x: 0, z: 610 }, guildHall: { x: 0, z: 6.2 }, church: { x: 0, z: 5.5 }, trainingGround: { x: 0, z: 48 }, academy: { x: 0, z: 9 }, inn: { x: 0, z: 5.4 } })[map] || { x: 0, z: 74 }; }
 function mat(color, rough = .82, em = 0x000000, pow = 0) { const k = `${color}:${rough}:${em}:${pow}`; if (!mats.has(k)) mats.set(k, new THREE.MeshStandardMaterial({ color, roughness: rough, emissive: em, emissiveIntensity: pow, flatShading: true })); return mats.get(k); }
 function add(geo, material, parent = world, cast = false, receive = true) { const m = new THREE.Mesh(geo, material); m.castShadow = Boolean(cast && quality.shadow); m.receiveShadow = receive; parent.add(m); return m; }
@@ -295,9 +349,63 @@ function unitGable() { let g = geoCache.get("gable"); if (!g) { const s = new TH
 // 単位三角プリズム（屋根用）: 幅1, 高さ1, 奥行1, 棟はz軸方向。インスタンス化で家ごとに拡大縮小する。
 const YAXIS = new THREE.Vector3(0, 1, 0);
 function prismGeo() { let g = geoCache.get("prism"); if (g) return g; const v = new Float32Array([-.5, 0, .5, .5, 0, .5, 0, 1, .5, -.5, 0, -.5, .5, 0, -.5, 0, 1, -.5]); g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(v, 3)); g.setIndex([0, 1, 2, 3, 5, 4, 0, 2, 5, 0, 5, 3, 1, 4, 5, 1, 5, 2, 0, 3, 4, 0, 4, 1]); g.computeVertexNormals(); geoCache.set("prism", g); return g; }
-function facadeTex() { if (texCache.has("facade")) return texCache.get("facade"); const c = document.createElement("canvas"); c.width = 128; c.height = 160; const x = c.getContext("2d"); x.fillStyle = "#cdb189"; x.fillRect(0, 0, 128, 160); x.strokeStyle = "#5a4128"; x.lineWidth = 7; x.strokeRect(4, 4, 120, 152); x.beginPath(); x.moveTo(64, 4); x.lineTo(64, 38); x.moveTo(20, 40); x.lineTo(108, 40); x.moveTo(20, 96); x.lineTo(108, 96); x.stroke(); x.fillStyle = "#3a2a18"; x.fillRect(18, 52, 32, 34); x.fillRect(78, 52, 32, 34); x.fillStyle = "#ffd98a"; x.fillRect(22, 56, 24, 26); x.fillRect(82, 56, 24, 26); x.strokeStyle = "#3a2a18"; x.lineWidth = 3; x.beginPath(); x.moveTo(34, 56); x.lineTo(34, 82); x.moveTo(22, 69); x.lineTo(46, 69); x.moveTo(94, 56); x.lineTo(94, 82); x.moveTo(82, 69); x.lineTo(106, 69); x.stroke(); x.fillStyle = "#4a3018"; x.fillRect(48, 104, 32, 52); x.fillStyle = "#2a1c10"; x.fillRect(52, 108, 24, 48); const t = new THREE.CanvasTexture(c); texCache.set("facade", t); return t; }
+function facadeTex() {
+  if (texCache.has("facade")) return texCache.get("facade");
+  const c = document.createElement("canvas"); c.width = 128; c.height = 160;
+  const x = c.getContext("2d");
+  x.fillStyle = "#c7ad84"; x.fillRect(0, 0, 128, 160);
+  x.fillStyle = "rgba(255,245,210,.18)"; for (let i = 0; i < 26; i++) x.fillRect(rand(8, 118), rand(8, 150), rand(2, 9), 1);
+  x.strokeStyle = "#4d3420"; x.lineWidth = 7; x.strokeRect(4, 4, 120, 152);
+  x.beginPath(); x.moveTo(64, 4); x.lineTo(64, 44); x.moveTo(20, 40); x.lineTo(108, 40); x.moveTo(20, 96); x.lineTo(108, 96); x.moveTo(13, 14); x.lineTo(58, 92); x.moveTo(115, 14); x.lineTo(70, 92); x.stroke();
+  x.fillStyle = "#2d2118"; x.fillRect(17, 52, 34, 35); x.fillRect(77, 52, 34, 35);
+  x.fillStyle = "#ffd98a"; x.fillRect(22, 56, 24, 26); x.fillRect(82, 56, 24, 26);
+  x.strokeStyle = "#2a1c12"; x.lineWidth = 3; x.beginPath(); x.moveTo(34, 56); x.lineTo(34, 82); x.moveTo(22, 69); x.lineTo(46, 69); x.moveTo(94, 56); x.lineTo(94, 82); x.moveTo(82, 69); x.lineTo(106, 69); x.stroke();
+  x.fillStyle = "#6f4a2c"; x.fillRect(15, 88, 38, 5); x.fillRect(75, 88, 38, 5);
+  x.fillStyle = "#3f7a4b"; x.fillRect(22, 90, 8, 5); x.fillRect(36, 90, 8, 5); x.fillRect(82, 90, 8, 5); x.fillRect(98, 90, 8, 5);
+  x.fillStyle = "#4a3018"; x.fillRect(47, 105, 34, 51);
+  x.fillStyle = "#2a1c10"; x.fillRect(52, 109, 24, 47);
+  x.fillStyle = "#d8b36b"; x.fillRect(71, 131, 4, 4);
+  const t = new THREE.CanvasTexture(c); texCache.set("facade", t); return t;
+}
 function instMat(k, opts) { if (mats.has(k)) return mats.get(k); const m = new THREE.MeshStandardMaterial(opts); mats.set(k, m); return m; }
-function buildHouseBatch(specs, facade) { if (!specs.length) return; const n = specs.length; const body = new THREE.InstancedMesh(boxGeo(1, 1, 1), instMat("instBody", { color: 0xffffff, roughness: .92, flatShading: true }), n); const roof = new THREE.InstancedMesh(prismGeo(), instMat("instRoof", { color: 0xffffff, roughness: .85, flatShading: true }), n); const fac = facade ? new THREE.InstancedMesh(boxGeo(1, 1, .14), instMat("instFacade", { map: facadeTex(), roughness: .9 }), n) : null; const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), O = new THREE.Vector3(), cb = new THREE.Color(), cr = new THREE.Color(); specs.forEach((s, i) => { Q.setFromAxisAngle(YAXIS, s.angle); const y = s.y || 0, rh = s.rh || s.w * .34; P.set(s.x, y + s.h / 2, s.z); S.set(s.w, s.h, s.d); M.compose(P, Q, S); body.setMatrixAt(i, M); body.setColorAt(i, cb.setHex(s.body)); P.set(s.x, y + s.h, s.z); S.set(s.w * 1.05, rh, s.d * 1.08); M.compose(P, Q, S); roof.setMatrixAt(i, M); roof.setColorAt(i, cr.setHex(s.roof)); if (fac) { O.set(0, 0, s.d / 2 + .08).applyQuaternion(Q); P.set(s.x + O.x, y + s.h * .47, s.z + O.z); S.set(s.w * .94, s.h * .92, .16); M.compose(P, Q, S); fac.setMatrixAt(i, M); } }); for (const m of [body, roof, fac]) { if (!m) continue; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.castShadow = false; m.receiveShadow = true; m.matrixAutoUpdate = false; m.matrixWorldAutoUpdate = false; world.add(m); } }
+function buildHouseBatch(specs, facade) {
+  if (!specs.length) return;
+  const n = specs.length;
+  const body = new THREE.InstancedMesh(boxGeo(1, 1, 1), instMat("instBody", { color: 0xffffff, roughness: .92, flatShading: true }), n);
+  const roof = new THREE.InstancedMesh(prismGeo(), instMat("instRoof", { color: 0xffffff, roughness: .85, flatShading: true }), n);
+  const ridge = new THREE.InstancedMesh(boxGeo(1, 1, 1), instMat("instRoofRidge", { color: 0x2e241e, roughness: .86, flatShading: true }), n);
+  const chimney = new THREE.InstancedMesh(boxGeo(1, 1, 1), instMat("instChimney", { color: 0x5a4a3e, roughness: .9, flatShading: true }), n);
+  const fac = facade ? new THREE.InstancedMesh(boxGeo(1, 1, .14), instMat("instFacade", { map: facadeTex(), roughness: .9 }), n) : null;
+  const awning = facade ? new THREE.InstancedMesh(boxGeo(1, 1, 1), instMat("instAwning", { color: 0x5f3d32, roughness: .82, flatShading: true }), n) : null;
+  const balcony = facade ? new THREE.InstancedMesh(boxGeo(1, 1, 1), instMat("instBalcony", { color: 0x4b3322, roughness: .86, flatShading: true }), n) : null;
+  const doorFrame = facade ? new THREE.InstancedMesh(boxGeo(1, 1, 1), instMat("instDoorFrame", { color: 0x2a1c12, roughness: .88, flatShading: true }), n) : null;
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), O = new THREE.Vector3(), cb = new THREE.Color(), cr = new THREE.Color();
+  const put = (mesh, i, s, q, lx, ly, lz, sx, sy, sz) => { O.set(lx, ly, lz).applyQuaternion(q); P.set(s.x + O.x, (s.y || 0) + O.y, s.z + O.z); S.set(sx, sy, sz); M.compose(P, q, S); mesh.setMatrixAt(i, M); };
+  specs.forEach((s, i) => {
+    Q.setFromAxisAngle(YAXIS, s.angle);
+    const y = s.y || 0, rh = s.rh || s.w * .34;
+    P.set(s.x, y + s.h / 2, s.z); S.set(s.w, s.h, s.d); M.compose(P, Q, S); body.setMatrixAt(i, M); body.setColorAt(i, cb.setHex(s.body));
+    P.set(s.x, y + s.h, s.z); S.set(s.w * 1.05, rh, s.d * 1.08); M.compose(P, Q, S); roof.setMatrixAt(i, M); roof.setColorAt(i, cr.setHex(s.roof));
+    put(ridge, i, s, Q, 0, s.h + rh * .98, 0, .28, .22, s.d * 1.16);
+    put(chimney, i, s, Q, s.w * .28, s.h + rh * .68, -s.d * .18, .52, 1.35, .52);
+    if (fac) {
+      put(fac, i, s, Q, 0, s.h * .47, s.d / 2 + .08, s.w * .94, s.h * .92, .16);
+      put(doorFrame, i, s, Q, 0, Math.min(s.h - .9, 2.05), s.d / 2 + .18, Math.min(1.9, s.w * .22), 2.1, .18);
+      put(awning, i, s, Q, 0, Math.min(s.h - .45, 3.05), s.d / 2 + .42, Math.min(4.4, s.w * .46), .18, .82);
+      put(balcony, i, s, Q, 0, Math.min(s.h - .7, s.h * .62), s.d / 2 + .38, Math.min(5.2, s.w * .52), .18, .62);
+    }
+  });
+  for (const m of [body, roof, ridge, chimney, fac, doorFrame, awning, balcony]) {
+    if (!m) continue;
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    m.castShadow = false;
+    m.receiveShadow = true;
+    m.matrixAutoUpdate = false;
+    m.matrixWorldAutoUpdate = false;
+    world.add(m);
+  }
+}
 function paintTexture(g, kind) { const R = (a, b) => a + Math.random() * (b - a); if (kind === "grass") { g.fillStyle = "#3c5639"; g.fillRect(0, 0, 128, 128); for (let i = 0; i < 1100; i++) { g.fillStyle = `hsl(${R(82, 122)},${R(28, 46)}%,${R(20, 40)}%)`; g.fillRect(R(0, 128), R(0, 128), R(1, 2.4), R(2, 5)); } return; } if (kind === "cobble") { g.fillStyle = "#2c271f"; g.fillRect(0, 0, 128, 128); for (let ry = 0; ry < 8; ry++) for (let rx = 0; rx < 8; rx++) { const off = (ry % 2) * 8, x = rx * 16 + off, y = ry * 16, dark = Math.random() < .3; g.fillStyle = `hsl(${R(22, 42)},${R(8, 18)}%,${dark ? R(20, 30) : R(33, 47)}%)`; round(g, x + 1.9, y + 1.9, 12.2, 12.2, 5); g.fill(); g.fillStyle = "rgba(255,255,255,.05)"; round(g, x + 2.6, y + 2.6, 5, 4, 2); g.fill(); } return; } if (kind === "dirt") { g.fillStyle = "#6b5942"; g.fillRect(0, 0, 128, 128); for (let i = 0; i < 800; i++) { g.fillStyle = `hsl(${R(24, 40)},${R(18, 36)}%,${R(26, 46)}%)`; g.fillRect(R(0, 128), R(0, 128), R(1, 3), R(1, 3)); } return; } if (kind === "stone") { g.fillStyle = "#46453d"; g.fillRect(0, 0, 128, 128); for (let ry = 0; ry < 4; ry++) for (let rx = 0; rx < 4; rx++) { const off = (ry % 2) * 16; g.fillStyle = `hsl(${R(34, 50)},${R(4, 10)}%,${R(40, 54)}%)`; round(g, rx * 32 + off + 2, ry * 32 + 2, 28, 28, 3); g.fill(); } return; } if (kind === "plank") { for (let i = 0; i < 8; i++) { g.fillStyle = `hsl(${R(22, 34)},${R(34, 50)}%,${R(22, 36)}%)`; g.fillRect(i * 16, 0, 16, 128); g.fillStyle = "rgba(0,0,0,.22)"; g.fillRect(i * 16, 0, 1.6, 128); } return; } g.fillStyle = "#555"; g.fillRect(0, 0, 128, 128); }
 function texFor(kind) { if (texCache.has(kind)) return texCache.get(kind); const c = document.createElement("canvas"); c.width = c.height = 128; paintTexture(c.getContext("2d"), kind); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; texCache.set(kind, t); return t; }
 function surfaceMat(kind, repX, repZ) { const k = `surf:${kind}:${repX.toFixed(1)}:${repZ.toFixed(1)}`; if (mats.has(k)) return mats.get(k); const t = texFor(kind).clone(); t.needsUpdate = true; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repX, repZ); const m = new THREE.MeshStandardMaterial({ map: t, roughness: .95 }); mats.set(k, m); return m; }
@@ -499,7 +607,7 @@ function placeModelNpc(modelKey, fallbackVariant, x, z, color, name, dialogue, o
   return n;
 }
 function buildForestRoad() { setEnv(0x6f91a1, 40, quality.fog); bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 }; ground(210, 290, 0x35513d); road(0, 0, 9, 260, 0x746756, "dirt"); for (let z = -120; z <= 120; z += 18) { road(-15, z, 20, 3, 0x665b4f, "dirt"); road(16, z + 8, 18, 2.8, 0x665b4f, "dirt"); } for (let i = 0; i < Math.floor(180 * quality.houses); i++) addTree((Math.random() < .5 ? -1 : 1) * rand(12, 86), rand(-128, 128), rand(.8, 1.4), true); for (let i = 0; i < Math.floor(60 * quality.props); i++) addRock(rand(-85, 85), rand(-125, 125), rand(.3, .8)); addGate(0, -112); addCaravan(6, 15); addSign(7, -90, "ROYAL CAPITAL"); locations.push({ id: "gate", name: "北門の検問を受ける", x: 0, z: -108, r: 6, dialogue: "north_gate" }, { id: "caravan", name: done("merchant") ? "救助済みの荷車を見る" : "荷車襲撃現場を見る", x: 6, z: 15, r: 6, dialogue: "caravan_attack" }); placeModelNpc("guard", "guard", 4, -98, 0xb77954, "北門衛兵", "north_gate", { map: "forestRoad" }); for (let i = 0; i < 4; i++) addNpc("guard", rand(-8, 8), rand(-70, 45), 0xb77954, "北門衛兵", "north_gate"); }
-function buildCity() { setEnv(0xbcd6e6, 130, 1500); bounds = { minX: -680, maxX: 680, minZ: -680, maxZ: 680 }; ground(1420, 1420, 0x6f8a52, "grass"); const floor = add(new THREE.PlaneGeometry(1330, 1330), surfaceMat("dirt", 90, 90), world, false, true); floor.rotation.x = -Math.PI / 2; floor.position.y = .012; cityWall(); road(0, 0, 24, 1240, 0x817767); road(0, 0, 1240, 24, 0x817767); for (const z of [-330, -130, 130, 330, 430]) road(0, z, 980, 9, 0x6f6657); for (const x of [-430, -330, -130, 130, 330, 430]) road(x, 0, 9, 980, 0x6f6657); castleHill(); centralPlaza(); guildDistrict(135, -70); churchDistrict(-185, -85); academyDistrict(-300, -60); marketDistrict(285, 85); craftDistrict(350, -125); nobleDistrict(-250, -350); slumDistrict(-410, 245); trainingDistrict(380, 330); gateDistrict(0, 610); shoppingStreet(); cityFill(); buildHouseBatch(facadeSpecs, true); buildHouseBatch(plainSpecs, false); traffic(); pedestrians(); props(); streetDressing(); addSign(0, 610, "NORTH GATE"); addSign(135, -38, "GUILD"); addSign(-185, -48, "CHURCH"); addSign(-300, -42, "ACADEMY"); addSign(285, 125, "MARKET"); addSign(-390, 235, "ALLEY"); locations.push({ id: "plaza", name: "中央広場を見渡す", x: 0, z: 40, r: 12, dialogue: "plaza" }, { id: "guild", name: "冒険者ギルドに入る", x: 135, z: -60, r: 10, dialogue: "guild" }, { id: "market", name: "市場の盗難騒ぎを見る", x: 260, z: 95, r: 13, dialogue: "market" }, { id: "church", name: "教会記録所で相談する", x: -185, z: -70, r: 12, dialogue: "church" }, { id: "training", name: "外門練習場へ行く", x: 360, z: 330, r: 13, dialogue: "training_gate" }, { id: "alley", name: "怪しい路地裏に入る", x: -390, z: 235, r: 12, dialogue: "alley" }, { id: "blacksmith", name: "鍛冶屋に近づく", x: 330, z: -110, r: 9, dialogue: "blacksmith" }); }
+function buildCity() { setEnv(0xbcd6e6, 130, 1500); bounds = { minX: -680, maxX: 680, minZ: -680, maxZ: 680 }; ground(1420, 1420, 0x6f8a52, "grass"); const floor = add(new THREE.PlaneGeometry(1330, 1330), surfaceMat("dirt", 90, 90), world, false, true); floor.rotation.x = -Math.PI / 2; floor.position.y = .012; cityWall(); road(0, 0, 24, 1240, 0x817767); road(0, 0, 1240, 24, 0x817767); for (const z of [-330, -130, 130, 330, 430]) road(0, z, 980, 9, 0x6f6657); for (const x of [-430, -330, -130, 130, 330, 430]) road(x, 0, 9, 980, 0x6f6657); minorAlleys(); castleHill(); centralPlaza(); guildDistrict(135, -70); churchDistrict(-185, -85); academyDistrict(-300, -60); marketDistrict(285, 85); craftDistrict(350, -125); nobleDistrict(-250, -350); slumDistrict(-410, 245); trainingDistrict(380, 330); gateDistrict(0, 610); shoppingStreet(); cityFill(); buildHouseBatch(facadeSpecs, true); buildHouseBatch(plainSpecs, false); traffic(); pedestrians(); props(); streetDressing(); addSign(0, 610, "NORTH GATE"); addSign(135, -38, "GUILD"); addSign(-185, -48, "CHURCH"); addSign(-300, -42, "ACADEMY"); addSign(285, 125, "MARKET"); addSign(-390, 235, "ALLEY"); locations.push({ id: "plaza", name: "中央広場を見渡す", x: 0, z: 40, r: 12, dialogue: "plaza" }, { id: "guild", name: "冒険者ギルドに入る", x: 135, z: -60, r: 10, dialogue: "guild" }, { id: "market", name: "市場の盗難騒ぎを見る", x: 260, z: 95, r: 13, dialogue: "market" }, { id: "church", name: "教会記録所で相談する", x: -185, z: -70, r: 12, dialogue: "church" }, { id: "training", name: "外門練習場へ行く", x: 360, z: 330, r: 13, dialogue: "training_gate" }, { id: "alley", name: "怪しい路地裏に入る", x: -390, z: 235, r: 12, dialogue: "alley" }, { id: "blacksmith", name: "鍛冶屋に近づく", x: 330, z: -110, r: 9, dialogue: "blacksmith" }); }
 function buildGuildHall() { setEnv(0x1f1711, 12, 36); bounds = { minX: -8, maxX: 8, minZ: -7, maxZ: 7 }; ground(16, 15, 0x4c3727, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.9)); const torch = new THREE.PointLight(0xffb86a, 8, 22, 2); torch.position.set(0, 3.6, -2); world.add(torch); room(16, 15, 3.2, 0x3a281c); box(0, .55, -4.5, 6.4, 1.1, .9, 0x6b4a2f, "counter", world, true); box(0, 1.2, -6.2, 5.6, 2.4, .5, 0x5a3d27, "shelf", world, true); addQuestBoard(-5.6, -4.4); const crystal = add(new THREE.SphereGeometry(.45, 16, 10), mat(0x80d8ff, .2, 0x65cfff, .9), world, false, false); crystal.position.set(3.6, 1.15, -3.4); cull(crystal, 3.6, -3.4, 60); cyl(3.6, .55, -3.4, .32, .8, 0x62513a, "crystalBase", world, true); placeModelNpc("guildReceptionist", "receptionist", 0, -3.3, 0xd8b36b, "受付", "guild_reception", { map: "guildHall" }); placeModelNpc("guildmaster", "noble", -3.8, -3.4, 0x4f5d6f, "ギルドマスター", "guildmaster", { map: "guildHall" }); addNpc("adventurer", -3.8, .9, 0x8c6f4f, "冒険者", "generic"); locations.push({ id: "reception", name: "受付で登録申請をする", x: 0, z: -3.3, r: 3, dialogue: "guild_reception" }, { id: "crystal", name: "魔力測定水晶に触れる", x: 3.6, z: -3.4, r: 2.6, dialogue: "mana_measure" }, { id: "guildmaster", name: "ギルドマスターと話す", x: -3.8, z: -3.4, r: 2.8, dialogue: "guildmaster" }, { id: "guild_exit", name: "王都へ戻る", x: 0, z: 6.7, r: 2.4, targetMap: "plaza", spawn: { x: 135, z: -42 } }); }
 function buildChurch() { setEnv(0x151823, 12, 36); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x5b5a55, "stone"); world.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1d28, 1.7)); const glow = new THREE.PointLight(0xbfd4ff, 6, 20, 2); glow.position.set(0, 3.4, -3); world.add(glow); room(14, 14, 4, 0x44434a); box(0, .55, -4.4, 3.8, 1.05, 1.25, 0xddd1ae, "altar", world, true); for (let i = 0; i < 4; i++) { box(-2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); box(2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); } placeModelNpc("priest", "priest", 0, -2.5, 0xc9c4ad, "司祭", "church", { map: "church" }); }
 function buildTrainingGround() { setEnv(0x88a6b4, 25, 180); bounds = { minX: -60, maxX: 60, minZ: -70, maxZ: 70 }; ground(130, 150, 0x556c4c); road(0, 0, 18, 130, 0x776b5a); for (let i = 0; i < 16; i++) cyl(rand(-35, 35), .85, rand(-40, 40), .25, 1.7, 0x7a5635, "target"); addSign(0, 48, "TO CAPITAL"); placeModelNpc("guard", "guard", -8, 12, 0xb77954, "訓練教官", "training", { map: "trainingGround" }); addNpc("adventurer", 10, -8, 0x6f8aa6, "模擬戦相手", "mock_battle"); locations.push({ id: "practice", name: "火球制御を練習する", x: -8, z: 12, r: 4, dialogue: "training" }, { id: "mock", name: "翌日の模擬戦を受ける", x: 10, z: -8, r: 4, dialogue: "mock_battle" }, { id: "training_exit", name: "王都へ戻る", x: 0, z: 52, r: 4, targetMap: "plaza", spawn: { x: 360, z: 305 } }); }
@@ -513,14 +621,17 @@ function buildInn() { setEnv(0x241a16, 12, 38); bounds = { minX: -7, maxX: 7, mi
 function cityWall() { for (const [x, z, w, d] of [[0, -675, 1320, 10], [0, 675, 1320, 10], [-675, 0, 10, 1320], [675, 0, 10, 1320]]) box(x, 5, z, w, 10, d, 0x6d6c64, "wall", world, true); for (let i = -620; i <= 620; i += 75) { box(i, 10, -675, 10, 18, 10, 0x74736b, "tower", world, true); box(i, 10, 675, 10, 18, 10, 0x74736b, "tower", world, true); box(-675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); box(675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); } }
 function addGate(x, z) { box(x, 4, z, 38, 8, 7, 0x6d6c64, "gate", world, true); box(x - 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); box(x + 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); }
 function gateDistrict(x, z) { addGate(x, z + 55); for (let i = -2; i <= 2; i++) addNpc("guard", x + i * 6, z - 8, 0xb77954, "衛兵", "north_gate"); box(x - 22, 2, z - 25, 20, 4, 14, 0x6a5e52, "checkpoint", world, true); box(x + 22, 2, z - 25, 20, 4, 14, 0x6a5e52, "checkpoint", world, true); }
-const WALL_P = [0xe6dcc4, 0xddd0b2, 0xd2c3a0, 0xe9e0cb, 0xcdbb98, 0xe3d8bf];
-const ROOF_P = [0xb5532f, 0x9c4528, 0x8a3f2a, 0xc0673a, 0x7e3a26, 0xa84d2c];
+const WALL_P = [0xd8c59f, 0xcbb58b, 0xbfa884, 0xd4c2aa, 0xb69b74, 0xc9b189, 0xa98f6b, 0xd0b79a];
+const ROOF_P = [0x8a3f2a, 0x7a3527, 0x6d3d31, 0x4f4654, 0x34506a, 0x5f3d2d, 0x9c5a38];
 function nearRoadLine(x, z, m) { for (const r of ROAD_LINES.vertical) if (Math.abs(x - r) < (r === 0 ? 15 : m)) return true; for (const r of ROAD_LINES.horizontal) if (Math.abs(z - r) < (r === 0 ? 15 : m)) return true; return false; }
 // 王城を頂く丘陵: 階段状のテラスに住宅が密集し、斜面を上るほど王城へ近づく遠景（-z側、当たり判定は基部の壁のみ）。
 function castleHill() { const terraces = 8, dz = 36, dy = 8, baseZ = -356; box(0, 5, baseZ + 2, 680, 10, 5, 0x9a9082, "wall", world, true); for (let k = 1; k <= terraces; k++) { const y = k * dy, zc = baseZ - k * dz, halfW = 330 - k * 30; box(0, y / 2, zc - dz * .5, halfW * 2 + 24, y + 2, dz + 10, 0x9a9082, "", world, false); box(0, y + 1.4, zc + 1.5, halfW * 2 + 24, 2.8, 1.6, 0x837a6b, "", world, false); for (let x = -halfW; x <= halfW; x += 15) { if (Math.abs(x) < 26) continue; if (Math.random() > .92) continue; const w = rand(7, 11), d = rand(7, 10), h = rand(6, 11); plainSpecs.push({ x: x + rand(-2, 2), z: zc - rand(4, dz - 8), y, w, d, h, rh: w * .36, angle: 0, body: pick(WALL_P), roof: pick(ROOF_P) }); } } const steps = Math.floor(terraces * dz / 5); for (let s = 0; s <= steps; s++) box(0, s * 5 * dy / dz, baseZ - s * 5, 22, 1.4, 6, 0xa89c88, "", world, false); castleOnHill(0, baseZ - terraces * dz + 14, terraces * dy); }
 function castleOnHill(x, z, y) { box(x, y + 12, z, 80, 24, 46, 0xd8cfbb, "", world, true); box(x, y + 27, z - 12, 44, 26, 26, 0xe0d8c4, "", world, true); for (const [sx, sz] of [[-42, -22], [42, -22], [-42, 22], [42, 22]]) { box(x + sx, y + 20, z + sz, 14, 44, 14, 0xcfc6b2, "", world, true); const r = add(new THREE.ConeGeometry(10, 17, 6), mat(0x3f5d78), world, true); r.position.set(x + sx, y + 50, z + sz); cull(r, x + sx, z + sz, 1500); } box(x, y + 42, z - 12, 16, 32, 16, 0xd8cfbb, "", world, true); const sr = add(new THREE.ConeGeometry(13, 27, 6), mat(0x3f5d78), world, true); sr.position.set(x, y + 70, z - 12); cull(sr, x, z, 1500); for (const sx of [-42, 42]) { const fl = box(x + sx, y + 58, z, .3, 6, .1, 0xb33a44, "", world); fl.scale.z = 30; } }
 // 平地の市街を道沿いに連続して埋める（インスタンス化。道路・広場・主要施設は避ける）。
 function cityFill() { const anchors = [[0, 0, 58], [135, -70, 30], [-185, -85, 32], [-300, -60, 44], [350, -125, 26], [285, 85, 86], [380, 330, 56], [0, 610, 44], [-250, -350, 50]]; const near = (x, z) => anchors.some((a) => Math.hypot(x - a[0], z - a[1]) < a[2]) || shopAnchors.some((a) => Math.hypot(x - a[0], z - a[1]) < a[2]); const slumRoof = [0x4d3a2a, 0x3b2d20, 0x5a4630, 0x46352a]; const slumWall = [0x8a7a5f, 0x6d5d44, 0x7d6a4e, 0x5d4b39]; const step = 14, prob = Math.min(1, quality.houses * .95); for (let x = -585; x <= 600; x += step) for (let z = -350; z <= 600; z += step) { if (nearRoadLine(x, z, 7)) continue; if (near(x, z)) continue; if (Math.random() > prob) continue; const slum = x < -300 && z > 165; const w = slum ? rand(5, 8) : rand(8, 12.5), d = slum ? rand(5, 8) : rand(8, 11.5), h = slum ? rand(3.5, 6) : rand(6, x > 110 && Math.abs(z) < 130 ? 14 : 11); const ang = roadFacingAngle(x, z) + (slum ? rand(-.22, .22) : rand(-.05, .05)); const jx = rand(-1.6, 1.6), jz = rand(-1.6, 1.6); (slum ? plainSpecs : facadeSpecs).push({ x: x + jx, z: z + jz, w, d, h, rh: w * rand(.3, .42), angle: ang, body: slum ? pick(slumWall) : pick(WALL_P), roof: slum ? pick(slumRoof) : pick(ROOF_P) }); const ab = rotatedAabb(w, d, ang); addCollider(x + jx, z + jz, ab.w * .92, ab.d * .92, "house"); } }
+function minorAlleys() {
+  for (const [x, z, w, d] of [[78, -42, 76, 4.4], [188, -42, 76, 4.4], [118, -12, 4.4, 62], [285, 35, 148, 4.2], [235, 88, 4.2, 92], [335, 88, 4.2, 92], [-245, -118, 86, 4.2], [-342, 214, 108, 4.2]]) road(x, z, w, d, 0x6b6255, "dirt");
+}
 function centralPlaza() { road(0, 0, 96, 96, 0x8e8370); fountain(0, 0, 4.2); box(0, 4, -30, 5, 8, 5, 0x9a9384, "statue", world, true); const N = 16, R = 62; for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2, px = Math.cos(a) * R, pz = Math.sin(a) * R; if (Math.abs(px) < 16 || Math.abs(pz) < 16) continue; const ang = faceToward(-px, -pz), w = rand(11, 15), d = rand(10, 13), h = rand(11, 17); facadeSpecs.push({ x: px, z: pz, w, d, h, rh: w * .34, angle: ang, body: pick(WALL_P), roof: pick(ROOF_P) }); const ab = rotatedAabb(w, d, ang); addCollider(px, pz, ab.w, ab.d, "house"); } for (let a = 0; a < Math.PI * 2; a += Math.PI / 5) lamp(Math.cos(a) * 43, Math.sin(a) * 43); }
 function guildDistrict(x, z) { house(x, z, 36, 24, 15, 0x6a5036, "GUILD", true, faceToward(0, 1)); box(x, 3, z + 13, 9, 6, .7, 0x201610, "guild", world, true); addQuestBoard(x - 22, z + 4); for (let i = 0; i < 8; i++) addNpc("adventurer", x + rand(-28, 28), z + rand(18, 36), pick([0x8c6f4f, 0x58718d, 0x5f7b55]), "冒険者", "generic"); }
 function churchDistrict(x, z) { house(x, z, 34, 26, 18, 0x7c7a76, "CHURCH", true, faceToward(0, 1)); const sp = add(new THREE.ConeGeometry(7, 24, 4), mat(0x2f3541), world, true); sp.position.set(x, 32, z); sp.rotation.y = Math.PI / 4; cull(sp, x, z, 900); for (let i = 0; i < 8; i++) addNpc("faithful", x + rand(-35, 35), z + rand(18, 45), 0xc9c4ad, "信徒", "church"); }
@@ -597,7 +708,7 @@ function castFireball(mode = "fire", free = false) { if (!state.started || !stat
 function crystalEffect() { audio.play("crystal_crack"); const pos = player.position.clone().add(new THREE.Vector3(0, 1.4, -1)); burstAt(pos, 0x80d8ff); state.shake = .25; }
 function updateEffects(dt) { state.fireCooldown = Math.max(0, state.fireCooldown - dt); state.burstCooldown = Math.max(0, state.burstCooldown - dt); state.shake = Math.max(0, state.shake - dt * 3); if (ui.cooldowns.fire) ui.cooldowns.fire.value = state.fireCooldown ? 1 - state.fireCooldown / .32 : 1; if (ui.cooldowns.burst) ui.cooldowns.burst.value = state.burstCooldown ? 1 - state.burstCooldown / .95 : 1; for (let i = projectiles.length - 1; i >= 0; i--) { const p = projectiles[i]; p.life -= dt; p.ball.position.addScaledVector(p.dir, p.speed * dt); const hit = !state.debug && p.life < .95 && (p.ball.position.y <= .18 || blocked(p.ball.position.x, p.ball.position.z, .25)); if (p.life <= 0 || hit) { audio.play("fireball_hit"); burstAt(p.ball.position, p.burst ? 0xffd27a : 0xff7a1c); state.hitStop = Math.max(state.hitStop, .06); world.remove(p.ball); projectiles.splice(i, 1); } } for (let i = bursts.length - 1; i >= 0; i--) { const b = bursts[i]; b.life -= dt; b.g.scale.setScalar(1 + (1 - b.life / b.max) * 2); if (b.life <= 0) { world.remove(b.g); bursts.splice(i, 1); } } }
 function burstAt(pos, color = 0xff7a1c) { const g = new THREE.Group(); g.position.copy(pos); world.add(g); for (let i = 0; i < 12; i++) add(new THREE.SphereGeometry(.07, 8, 6), mat(color, .32, color, 1.4), g); bursts.push({ g, life: .45, max: .45 }); state.shake = .18; }
-function loop() { let dt = Math.min(clock.getDelta(), .05); if (state.hitStop > 0) { state.hitStop -= dt; dt *= .2; } if (state.started && state.loaded) { if (!params.has("time")) { state.dayClock += dt; if (state.dayClock >= 180) { state.dayClock = 0; setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); } } controls(dt); updateMovers(dt); updateEffects(dt); detect(); updateCulling(); cameraUpdate(); } renderer.render(scene, camera); requestAnimationFrame(loop); }
+function loop() { let dt = Math.min(clock.getDelta(), .05); if (state.hitStop > 0) { state.hitStop -= dt; dt *= .2; } if (state.started && state.loaded) { if (!params.has("time")) { state.dayClock += dt; if (state.dayClock >= 180) { state.dayClock = 0; setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); } } controls(dt); updateMovers(dt); updateEffects(dt); updateTimeTransition(dt); detect(); updateCulling(); cameraUpdate(); } renderer.render(scene, camera); requestAnimationFrame(loop); }
 function controls(dt) { if (state.menuOpen) return; handlePad(); if (state.inDialogue) return; let x = (state.keys.has("KeyD") ? 1 : 0) - (state.keys.has("KeyA") ? 1 : 0); let y = (state.keys.has("KeyW") ? 1 : 0) - (state.keys.has("KeyS") ? 1 : 0); const p = gamepad(); if (p) { x += dead(p.axes[0] || 0); y += -dead(p.axes[1] || 0); state.yaw -= dead(p.axes[2] || 0) * 2.8 * dt; state.pitch = THREE.MathUtils.clamp(state.pitch - dead(p.axes[3] || 0) * 1.8 * dt, -.55, .75); } state.yaw += ((state.keys.has("ArrowLeft") ? 1 : 0) - (state.keys.has("ArrowRight") ? 1 : 0)) * 2.25 * dt; state.pitch = THREE.MathUtils.clamp(state.pitch + ((state.keys.has("ArrowUp") ? 1 : 0) - (state.keys.has("ArrowDown") ? 1 : 0)) * 1.35 * dt, -.55, .75); if (state.keys.has("KeyJ")) { castFireball("fire"); state.keys.delete("KeyJ"); } if (state.keys.has("KeyL")) { castFireball("burst"); state.keys.delete("KeyL"); } if (state.keys.has("KeyK")) { dodge(); state.keys.delete("KeyK"); } const up = (state.debug && state.keys.has("Space") ? 1 : 0) - (state.debug && (state.keys.has("ControlLeft") || state.keys.has("ControlRight")) ? 1 : 0); const len = Math.hypot(x, y, up); if (len < .01) { regen(dt, 22); return; } x /= Math.max(1, len); y /= Math.max(1, len); const dash = state.keys.has("ShiftLeft") || state.keys.has("ShiftRight") || (p && (p.buttons[7]?.value || 0) > .25); state.isDashing = dash && state.player.stamina > 2; const speed = state.debug ? (state.isDashing ? 120 : 55) : (state.isDashing ? 19.0 : 10.0); if (!state.debug) state.isDashing ? state.player.stamina = Math.max(0, state.player.stamina - 30 * dt) : regen(dt, 18); const rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw), fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw); move((rx * x + fx * y) * speed * dt, (rz * x + fz * y) * speed * dt, up * speed * dt); }
 function move(dx, dz, dy) { const nx = THREE.MathUtils.clamp(player.position.x + dx, bounds.minX, bounds.maxX); if (state.debug || !blocked(nx, player.position.z)) player.position.x = nx; const nz = THREE.MathUtils.clamp(player.position.z + dz, bounds.minZ, bounds.maxZ); if (state.debug || !blocked(player.position.x, nz)) player.position.z = nz; player.position.y = state.debug ? THREE.MathUtils.clamp(player.position.y + dy, 0, 160) : 0; if (Math.hypot(dx, dz) > .001) player.rotation.y = Math.atan2(dx, dz); staminaText(); }
 function dodge() { const back = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw)); move(back.x * 2.8, back.z * 2.8, 0); burstAt(player.position.clone().add(new THREE.Vector3(0, .5, 0)), 0x87c7ff); }

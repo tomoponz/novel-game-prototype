@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Novel RPG Prototype</title>
   <link rel="stylesheet" href="style.css?v=ui-hud-town-polish-20260628b">
+  <link rel="stylesheet" href="next_destination.css?v=next-destination-panel-20260628">
 </head>
 <body>
   <main id="app">
@@ -25,6 +26,13 @@
       <p id="play-objective" class="play-objective"></p>
       <p id="play-area" class="play-area"></p>
     </section>
+
+    <!-- Issue #10 の最小実装: 既存objectiveを右上の次目的地パネルにも同期する -->
+    <aside id="next-destination-panel" class="next-destination-panel" aria-label="次の目的地">
+      <p class="next-label">NEXT DESTINATION</p>
+      <p id="next-destination-label" class="next-destination-label">目的地を確認中</p>
+      <p id="next-destination-area" class="next-destination-area">AURELIA</p>
+    </aside>
 
     <aside id="interact-hint" class="interact-hint is-hidden">
       <kbd>E</kbd> <span id="interact-text">話す</span>
@@ -130,6 +138,7 @@
   </main>
 
   <script src="story.js"></script>
+  <script src="next_destination.js?v=next-destination-panel-20260628"></script>
   <script>
     (() => {
       const rawDpr = window.devicePixelRatio || 1;

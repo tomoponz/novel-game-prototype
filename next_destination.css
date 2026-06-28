@@ -1,0 +1,54 @@
+.next-destination-panel {
+  position: fixed;
+  z-index: 5;
+  top: 18px;
+  right: 18px;
+  width: min(280px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 16px;
+  background: rgba(5, 7, 11, .66);
+  box-shadow: 0 14px 34px rgba(0,0,0,.30);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.next-label {
+  margin: 0 0 6px;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .18em;
+}
+
+.next-destination-label {
+  margin: 0;
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.45;
+  text-shadow: 0 2px 10px rgba(0,0,0,.75);
+}
+
+.next-destination-area {
+  margin: 5px 0 0;
+  color: rgba(246,239,225,.66);
+  font-size: 11px;
+  letter-spacing: .10em;
+}
+
+body.ui-dialogue .next-destination-panel,
+body.ui-menu .next-destination-panel {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .next-destination-panel {
+    top: 58px;
+    right: 10px;
+    width: min(240px, calc(100vw - 20px));
+    padding: 10px 12px;
+  }
+  .next-destination-label { font-size: 12px; }
+  .next-destination-area { font-size: 10px; }
+}

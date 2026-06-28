@@ -48,6 +48,19 @@ roles are differentiated by runtime material color tints in `CHARACTER_MODELS`.
 | Female peasant | Superhero_Female + Female_Peasant + Hair_SimpleParted | `assets/models/characters/guild_receptionist/` | guild_receptionist, inn_marta, academy_teacher |
 | Male peasant | Superhero_Male + Male_Peasant + Hair_SimpleParted | `assets/models/characters/male_common/` | guildmaster, priest, gate guard, training instructor |
 
+## Expansion (feature/all-human-gltf-npc-pool)
+
+This pass broadens human NPC usage through the same two prepared runtime sets
+instead of copying additional texture-heavy source files. The model registry now
+adds role variants for adventurers, merchants, students, townsfolk, faithful,
+slum residents, blacksmiths, and nobles. These variants reuse the female peasant
+or male peasant runtime parts with different material tints and scales.
+
+Low/Medium/High modes cap external human NPC attempts at 12/24/40 per loaded
+map. Ambient crowds have a smaller 4/10/20 sub-budget so named or fixed NPCs can
+still receive external models. Any budget exhaustion, missing file, failed load,
+or failed visibility check leaves the existing primitive fallback visible.
+
 All assets are Quaternius CC0 1.0 (credit optional: Quaternius / quaternius.com).
 Both sets keep the full rigged base body under the outfit (texture-stripped,
 material colors only). Known limitation: the bind pose is a static T-pose and the

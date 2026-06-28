@@ -27,11 +27,13 @@
       <p id="play-area" class="play-area"></p>
     </section>
 
-    <!-- Issue #10 の最小実装: 既存objectiveを右上の次目的地パネルにも同期する -->
-    <aside id="next-destination-panel" class="next-destination-panel" aria-label="次の目的地">
+    <!-- Issue #10 の小実装: 既存objectiveと現在位置を右上パネルに同期する -->
+    <aside id="next-destination-panel" class="next-destination-panel" aria-label="次の目的地と現在地">
       <p class="next-label">NEXT DESTINATION</p>
       <p id="next-destination-label" class="next-destination-label">目的地を確認中</p>
       <p id="next-destination-area" class="next-destination-area">AURELIA</p>
+      <canvas id="mini-map-canvas" class="mini-map-canvas" width="220" height="150" aria-label="現在地ミニマップ"></canvas>
+      <p id="mini-map-caption" class="mini-map-caption">現在地を同期中</p>
     </aside>
 
     <aside id="interact-hint" class="interact-hint is-hidden">
@@ -138,7 +140,7 @@
   </main>
 
   <script src="story.js"></script>
-  <script src="next_destination.js?v=next-destination-panel-20260628"></script>
+  <script src="next_destination.js?v=next-destination-panel-20260628b"></script>
   <script>
     (() => {
       const rawDpr = window.devicePixelRatio || 1;

@@ -46,13 +46,45 @@ const FEMALE_PEASANT_PARTS = [RECEP_DIR + "base.gltf", RECEP_DIR + "outfit.gltf"
 const MALE_DIR = "assets/models/characters/male_common/";
 const MALE_PARTS = [MALE_DIR + "base.gltf", MALE_DIR + "outfit.gltf", MALE_DIR + "hair.gltf"];
 const CHARACTER_MODELS = {
-  guildReceptionist: { parts: FEMALE_PEASANT_PARTS, scale: 1.14, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x4a7a9c, hair: 0x6a4a2c } },
-  innMarta: { parts: FEMALE_PEASANT_PARTS, scale: 1.17, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x9a5a3a, hair: 0x5a3a22 } },
-  academyTeacher: { parts: FEMALE_PEASANT_PARTS, scale: 1.18, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x3a2e6a, hair: 0x2a2030 } },
-  guildmaster: { parts: MALE_PARTS, scale: 1.2, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x40485a, hair: 0x55504a } },
-  priest: { parts: MALE_PARTS, scale: 1.16, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0xddd6c2, hair: 0xb8b2a2 } },
-  guard: { parts: MALE_PARTS, scale: 1.18, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x6a6f7a, hair: 0x3a2c20 } }
+  guildReceptionist: { parts: FEMALE_PEASANT_PARTS, scale: 1.14, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x4a7a9c, hair: 0x6a4a2c }, shadow: true },
+  innMarta: { parts: FEMALE_PEASANT_PARTS, scale: 1.17, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x9a5a3a, hair: 0x5a3a22 }, shadow: true },
+  academyTeacher: { parts: FEMALE_PEASANT_PARTS, scale: 1.18, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x3a2e6a, hair: 0x2a2030 }, shadow: true },
+  guildmaster: { parts: MALE_PARTS, scale: 1.2, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x40485a, hair: 0x55504a }, shadow: true },
+  priest: { parts: MALE_PARTS, scale: 1.16, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0xddd6c2, hair: 0xb8b2a2 }, shadow: true },
+  guard: { parts: MALE_PARTS, scale: 1.18, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x6a6f7a, hair: 0x3a2c20 }, shadow: true },
+  adventurerMale: { parts: MALE_PARTS, scale: 1.15, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x5f6b4b, hair: 0x3a2c20 } },
+  adventurerFemale: { parts: FEMALE_PEASANT_PARTS, scale: 1.13, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x5b6f7f, hair: 0x4a2f1c } },
+  merchantMale: { parts: MALE_PARTS, scale: 1.12, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x9a6f44, hair: 0x4a2f1c } },
+  merchantFemale: { parts: FEMALE_PEASANT_PARTS, scale: 1.1, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x9a6a54, hair: 0x6a4a2c } },
+  studentMale: { parts: MALE_PARTS, scale: 1.1, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x2e3a5c, hair: 0x2b2118 } },
+  studentFemale: { parts: FEMALE_PEASANT_PARTS, scale: 1.08, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x2e3a5c, hair: 0x35304a } },
+  townsfolkMale: { parts: MALE_PARTS, scale: 1.09, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x6f7a6a, hair: 0x4a2f1c } },
+  townsfolkFemale: { parts: FEMALE_PEASANT_PARTS, scale: 1.07, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x7f6f8d, hair: 0x6e4a2a } },
+  faithful: { parts: MALE_PARTS, scale: 1.12, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0xd8d0bc, hair: 0x8f887a } },
+  slumResident: { parts: MALE_PARTS, scale: 1.05, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x4f4238, hair: 0x2b2118 } },
+  blacksmith: { parts: MALE_PARTS, scale: 1.18, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x6f4b32, hair: 0x3a2c20 }, shadow: true },
+  noble: { parts: MALE_PARTS, scale: 1.16, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x3a3050, hair: 0x4a3a2a }, shadow: true }
 };
+const MODEL_NPC_BUDGET = { low: 12, medium: 24, high: 40 };
+const AMBIENT_MODEL_NPC_BUDGET = { low: 4, medium: 10, high: 20 };
+const HUMAN_MODEL_KEYS = {
+  receptionist: ["guildReceptionist"],
+  priest: ["priest"],
+  guard: ["guard"],
+  teacher: ["academyTeacher"],
+  noble: ["noble"],
+  blacksmith: ["blacksmith"],
+  adventurer: ["adventurerMale", "adventurerFemale"],
+  merchant: ["merchantMale", "merchantFemale"],
+  student: ["studentFemale", "studentMale"],
+  faithful: ["faithful"],
+  slum: ["slumResident"],
+  traveler: ["townsfolkMale", "townsfolkFemale"]
+};
+let modelNpcBudget = MODEL_NPC_BUDGET[qualityMode] || MODEL_NPC_BUDGET.medium;
+let ambientModelNpcBudget = AMBIENT_MODEL_NPC_BUDGET[qualityMode] || AMBIENT_MODEL_NPC_BUDGET.medium;
+const modelStats = { external: 0, fallback: 0, primitive: 0, loading: 0, budget: modelNpcBudget, remaining: modelNpcBudget, ambientBudget: ambientModelNpcBudget, ambientRemaining: ambientModelNpcBudget, quality: qualityMode, map: "" };
+window.__AURELIA_MODEL_STATS__ = modelStats;
 
 const ROAD_LINES = {
   vertical: [-430, -330, -130, 0, 130, 330, 430],
@@ -277,7 +309,29 @@ function faceToward(dx, dz) { return Math.atan2(dx, dz); }
 function roadFacingAngle(x, z) { let best = { dist: Infinity, dx: 0, dz: 1 }; for (const rx of ROAD_LINES.vertical) { const dist = Math.abs(x - rx); if (dist < best.dist) best = { dist, dx: rx - x, dz: 0 }; } for (const rz of ROAD_LINES.horizontal) { const dist = Math.abs(z - rz); if (dist < best.dist) best = { dist, dx: 0, dz: rz - z }; } return faceToward(best.dx, best.dz || 0.0001); }
 function rotatedAabb(w, d, angle) { const c = Math.abs(Math.cos(angle)), s = Math.abs(Math.sin(angle)); return { w: w * c + d * s, d: w * s + d * c }; }
 
-function loadMap(id, spawn) { state.map = id; world.clear(); npcs.forEach((n) => scene.remove(n)); npcs = []; movers = []; locations = []; colliders = []; colliderGrid = new Map(); cullables = []; projectiles = []; bursts = []; facadeSpecs = []; plainSpecs = []; shopAnchors = []; ({ forestRoad: buildForestRoad, plaza: buildCity, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround, academy: buildAcademy, inn: buildInn }[id] || buildForestRoad)(); locations.forEach(addMarker); applyTimeOfDay(); player.position.set(spawn.x, spawn.y || 0, spawn.z); updateHud(); updateCulling(); }
+function loadMap(id, spawn) {
+  state.map = id;
+  world.clear();
+  npcs.forEach((n) => scene.remove(n));
+  npcs = [];
+  movers = [];
+  locations = [];
+  colliders = [];
+  colliderGrid = new Map();
+  cullables = [];
+  projectiles = [];
+  bursts = [];
+  facadeSpecs = [];
+  plainSpecs = [];
+  shopAnchors = [];
+  resetModelNpcBudget(id);
+  ({ forestRoad: buildForestRoad, plaza: buildCity, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround, academy: buildAcademy, inn: buildInn }[id] || buildForestRoad)();
+  locations.forEach(addMarker);
+  applyTimeOfDay();
+  player.position.set(spawn.x, spawn.y || 0, spawn.z);
+  updateHud();
+  updateCulling();
+}
 function playMapTransitionSound(targetMap) { audio.play(INDOOR_MAPS.has(state.map) && !INDOOR_MAPS.has(targetMap) ? "door_close" : "door_open"); }
 function loadGltf(url) {
   return new Promise((resolve, reject) => modelLoader.load(url, resolve, undefined, reject));
@@ -296,14 +350,14 @@ function loadCharacterModel(key, urls) {
   });
 }
 function matKind(name) { name = (name || "").toLowerCase(); if (name.includes("hair") || name.includes("beard")) return "hair"; if (name.includes("eye")) return "eye"; if (name.includes("peasant") || name.includes("ranger") || name.includes("outfit") || name.includes("cloth") || name.includes("robe")) return "outfit"; return "skin"; }
-function fitExternalNpcModel(model, scale, tint) {
+function fitExternalNpcModel(model, scale, tint, castShadow = false) {
   model.scale.setScalar(scale);
   model.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(model);
   if (Number.isFinite(box.min.y)) model.position.y -= box.min.y;
   model.traverse((obj) => {
     if (!obj.isMesh) return;
-    obj.castShadow = Boolean(quality.shadow && qualityMode !== "low");
+    obj.castShadow = Boolean(castShadow);
     obj.receiveShadow = false;
     obj.frustumCulled = true;
     const mats = (Array.isArray(obj.material) ? obj.material : [obj.material]).filter(Boolean);
@@ -312,6 +366,77 @@ function fitExternalNpcModel(model, scale, tint) {
   return model;
 }
 const modelDebug = params.has("modelDebug");
+function resetModelNpcBudget(mapId) {
+  modelNpcBudget = MODEL_NPC_BUDGET[qualityMode] || MODEL_NPC_BUDGET.medium;
+  ambientModelNpcBudget = AMBIENT_MODEL_NPC_BUDGET[qualityMode] || AMBIENT_MODEL_NPC_BUDGET.medium;
+  Object.assign(modelStats, { external: 0, fallback: 0, primitive: 0, loading: 0, budget: modelNpcBudget, remaining: modelNpcBudget, ambientBudget: ambientModelNpcBudget, ambientRemaining: ambientModelNpcBudget, quality: qualityMode, map: mapId });
+  updateModelStatsDataset();
+}
+function reserveModelNpcSlot(ambient = false) {
+  if (modelNpcBudget <= 0) return false;
+  if (ambient && ambientModelNpcBudget <= 0) return false;
+  modelNpcBudget--;
+  if (ambient) ambientModelNpcBudget--;
+  modelStats.remaining = modelNpcBudget;
+  modelStats.ambientRemaining = ambientModelNpcBudget;
+  updateModelStatsDataset();
+  return true;
+}
+function modelStatusBucket(status) {
+  if (status === "loaded") return "external";
+  if (status === "loading") return "loading";
+  if (status === "primitive") return "primitive";
+  if (status === "fallback" || status === "invalid-box") return "fallback";
+  return null;
+}
+function updateModelStatsDataset() {
+  try {
+    document.body.dataset.modelExternal = String(modelStats.external);
+    document.body.dataset.modelFallback = String(modelStats.fallback);
+    document.body.dataset.modelPrimitive = String(modelStats.primitive);
+    document.body.dataset.modelLoading = String(modelStats.loading);
+    document.body.dataset.modelBudget = String(modelStats.budget);
+    document.body.dataset.modelRemaining = String(modelStats.remaining);
+    document.body.dataset.modelAmbientBudget = String(modelStats.ambientBudget);
+    document.body.dataset.modelAmbientRemaining = String(modelStats.ambientRemaining);
+  } catch {}
+}
+const AMBIENT_HUMAN_DIALOGUES = new Set(["generic", "townsfolk", "market", "alley", "academy_student"]);
+function isAmbientHumanNpc(variant, dialogue, options = {}) {
+  if (options.priority === "fixed") return false;
+  if (options.label === false) return true;
+  if (AMBIENT_HUMAN_DIALOGUES.has(dialogue)) return true;
+  return state.map === "plaza" && (variant === "faithful" || variant === "student" || variant === "slum");
+}
+function chooseHumanModelKey(variant, options = {}) {
+  if (options.modelKey) return options.modelKey;
+  const keys = HUMAN_MODEL_KEYS[variant];
+  return keys ? pick(keys) : null;
+}
+function addPrimitiveNpc(variant, x, z, color, name, dialogue, options = {}) {
+  const n = createPerson(variant, color);
+  n.position.set(x, 0, z);
+  n.userData = { kind: "npc", id: dialogue, name, dialogue, r: .8, modelKey: options.modelKey || null, modelStatus: "primitive" };
+  if (options.label !== false) {
+    const lab = label(name);
+    lab.position.set(0, 2.55, 0);
+    lab.scale.set(1.6, .4, 1);
+    n.add(lab);
+  }
+  scene.add(n);
+  npcs.push(n);
+  modelStats.primitive++;
+  updateModelStatsDataset();
+  if (modelDebug && options.modelKey) addModelDebugTag(n, "primitive" + (options.reason ? ":" + options.reason : ""));
+  return n;
+}
+function addHumanNpc(variant, x, z, color, name, dialogue, options = {}) {
+  const modelKey = chooseHumanModelKey(variant, options);
+  if (!modelKey || options.model === false) return addPrimitiveNpc(variant, x, z, color, name, dialogue, { ...options, modelKey, reason: "disabled" });
+  const ambient = isAmbientHumanNpc(variant, dialogue, options);
+  if (!reserveModelNpcSlot(ambient)) return addPrimitiveNpc(variant, x, z, color, name, dialogue, { ...options, modelKey, reason: ambient ? "ambient-budget" : "budget" });
+  return placeModelNpc(modelKey, variant, x, z, color, name, dialogue, { ...options, reservedModelSlot: true });
+}
 // 表示検証: meshが存在し、Box3の高さが妥当な範囲にあるか（崩壊/極小/巨大なら不合格）
 function verifyModelVisible(model) {
   let meshes = 0; model.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) meshes++; });
@@ -324,7 +449,12 @@ function verifyModelVisible(model) {
   return { ok: true, height: size.y };
 }
 function setModelStatus(n, modelKey, status, reason) {
+  const prev = modelStatusBucket(n.userData.modelStatus);
+  if (prev && modelStats[prev] > 0) modelStats[prev]--;
   n.userData.modelStatus = status;
+  const next = modelStatusBucket(status);
+  if (next) modelStats[next]++;
+  updateModelStatsDataset();
   try { document.body.dataset[modelKey + "Model"] = status; } catch {}
   if (modelDebug) addModelDebugTag(n, status + (reason ? ":" + reason : ""));
 }
@@ -338,23 +468,27 @@ function placeModelNpc(modelKey, fallbackVariant, x, z, color, name, dialogue, o
   const n = new THREE.Group();
   n.position.set(x, 0, z);
   n.rotation.y = options.rotationY ?? def?.npcRotationY ?? 0;
-  n.userData = { kind: "npc", id: dialogue, name, dialogue, r: .8, modelKey, modelStatus: "loading" };
+  n.userData = { kind: "npc", id: dialogue, name, dialogue, r: .8, modelKey, modelStatus: "pending" };
   const fallback = createPerson(fallbackVariant, color);
   fallback.userData.isModelFallback = true;
   n.add(fallback);
-  const lab = label(name);
-  lab.position.set(0, 2.55, 0);
-  lab.scale.set(1.6, .4, 1);
-  n.add(lab);
+  if (options.label !== false) {
+    const lab = label(name);
+    lab.position.set(0, 2.55, 0);
+    lab.scale.set(1.6, .4, 1);
+    n.add(lab);
+  }
   scene.add(n);
   npcs.push(n);
-  setModelStatus(n, modelKey, "loading");
   if (!def) { setModelStatus(n, modelKey, "fallback", "no-def"); return n; }
+  if (!options.reservedModelSlot && !reserveModelNpcSlot()) { setModelStatus(n, modelKey, "primitive", "budget"); return n; }
+  setModelStatus(n, modelKey, "loading");
   const targetMap = options.map || state.map;
   loadCharacterModel(modelKey, def.parts).then((model) => {
     if (!n.parent || state.map !== targetMap) return; // マップが変わっていたら破棄
     model.rotation.y = def.rotationY || 0;
-    const fitted = fitExternalNpcModel(model, def.scale || 1, def.tint);
+    const castShadow = Boolean((options.important || def.shadow) && quality.shadow && qualityMode !== "low");
+    const fitted = fitExternalNpcModel(model, def.scale || 1, def.tint, castShadow);
     const v = verifyModelVisible(fitted);
     if (!v.ok) { setModelStatus(n, modelKey, "invalid-box", v.reason); return; } // 表示検証NG → fallback維持
     if (def.offset) fitted.position.set((def.offset.x || 0), fitted.position.y + (def.offset.y || 0), (def.offset.z || 0));
@@ -400,7 +534,15 @@ function denseBlocks() { const zones = [[-360, 80, -80, 570, "slum"], [-520, -12
 function placeStreetHouse(x, z, sign = null, important = false) { house(x, z, rand(8, 15), rand(8, 13), rand(5, 10), pick([0x7b5a3d, 0x83684d, 0x6d5d4a, 0x8d6542]), sign, important, roadFacingAngle(x, z)); }
 function props() { for (let i = 0; i < 110 * quality.props; i++) Math.random() < .6 ? crates(rand(-590, 590), rand(-590, 590), Math.floor(rand(2, 5))) : addRock(rand(-590, 590), rand(-590, 590), rand(.25, .6)); }
 function traffic() { const routes = [[[-610, 15], [-220, 15], [80, 15], [610, 15]], [[15, 620], [15, 260], [15, -40], [15, -610]], [[-15, -610], [-15, -300], [-15, 40], [-15, 620]], [[240, 260], [350, 90], [420, -120], [260, -260]]]; for (let i = 0; i < quality.carts; i++) { const obj = cart(); const path = routes[i % routes.length]; obj.position.set(path[0][0], 0, path[0][1] + i * 4); world.add(obj); movers.push({ type: "cart", obj, path, index: 1, speed: rand(2.4, 4.2), wait: 0, r: 2.4 }); } }
-function pedestrians() { const routes = [[[-580, 8], [-280, 8], [0, 8], [280, 8], [580, 8]], [[8, 600], [8, 260], [8, -80], [8, -580]], [[-390, 260], [-420, 230], [-360, 180], [-300, 210]], [[230, 100], [300, 110], [350, 80], [280, 40]], [[130, -55], [0, 0], [-185, -75]]]; for (let i = 0; i < 45 * quality.npcs; i++) { const path = JSON.parse(JSON.stringify(pick(routes))); const obj = createPerson(pick(["traveler", "merchant", "adventurer", "faithful", "slum"]), pick([0x7f9fbd, 0x8c6f4f, 0x6f8aa6, 0x8c7b5b, 0x9a6f54])); obj.position.set(path[0][0] + rand(-4, 4), 0, path[0][1] + rand(-4, 4)); scene.add(obj); npcs.push(obj); movers.push({ type: "ped", obj, path, index: 1, speed: rand(1.1, 2.2), wait: rand(0, 1), r: .7 }); } }
+function pedestrians() {
+  const routes = [[[-580, 8], [-280, 8], [0, 8], [280, 8], [580, 8]], [[8, 600], [8, 260], [8, -80], [8, -580]], [[-390, 260], [-420, 230], [-360, 180], [-300, 210]], [[230, 100], [300, 110], [350, 80], [280, 40]], [[130, -55], [0, 0], [-185, -75]]];
+  for (let i = 0; i < 45 * quality.npcs; i++) {
+    const path = JSON.parse(JSON.stringify(pick(routes)));
+    const variant = pick(["traveler", "merchant", "adventurer", "faithful", "slum"]);
+    const obj = addNpc(variant, path[0][0] + rand(-4, 4), path[0][1] + rand(-4, 4), pick([0x7f9fbd, 0x8c6f4f, 0x6f8aa6, 0x8c7b5b, 0x9a6f54]), "通行人", "townsfolk", { label: false });
+    movers.push({ type: "ped", obj, path, index: 1, speed: rand(1.1, 2.2), wait: rand(0, 1), r: .7 });
+  }
+}
 
 function house(x, z, w, d, h, color, sign = null, important = false, angle = 0) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle; world.add(g); const sH = Math.min(1.1, h * .3), fz = d * .48; box(0, sH / 2, 0, w, sH, d, 0x6f6253, "", g); box(0, sH + (h - sH) / 2, 0, w * .96, h - sH, d * .96, color, "", g); box(0, sH + .95, fz + .07, 1.3, Math.min(1.9, h - sH - .3), .14, 0x2a1c12, "", g); for (const wx of [-w * .29, w * .29]) { box(wx, h - .78, fz + .02, .76, .78, .05, 0x2a1c12, "", g); const gl = add(boxGeo(.58, .6, .05), mat(0xffd486, .4, 0xffb74d, .82), g); gl.position.set(wx, h - .78, fz + .05); } const rh = Math.max(1.3, w * .36), a = Math.atan2(rh, w / 2), L = Math.hypot(w / 2, rh) * 1.05, rc = pick([0x6e2f28, 0x46342a, 0x32506c, 0x2e463a]); for (const s of [-1, 1]) { const pl = add(boxGeo(L, .22, d * 1.12), mat(rc), g, important); pl.position.set(s * w / 4, h + rh / 2, 0); pl.rotation.z = -s * a; } box(0, h + rh, 0, .2, .2, d * 1.14, 0x241a12, "", g); for (const s of [-1, 1]) { const gb = add(unitGable(), mat(color), g); gb.scale.set(w / 2, rh, 1); gb.position.set(0, h, s * fz); if (s < 0) gb.rotation.y = Math.PI; } if (important) { box(w * .32, h + rh * .55, -d * .22, .5, rh * 1.2, .5, 0x4a3a2c, "", g); for (const bx of [-w * .42, 0, w * .42]) box(bx, sH + (h - sH) / 2, fz + .02, .1, h - sH, .05, 0x3b2a1d, "", g); box(0, h - .12, fz + .02, w * .92, .14, .06, 0x3b2a1d, "", g); } if (sign) { box(0, h - .25, fz + .5, .5, .08, .5, 0x241a12, "", g); const lab = label(sign); lab.position.set(0, h - .8, fz + .6); lab.scale.set(1.7, .42, 1); g.add(lab); } const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, important ? "major" : "house"); cull(g, x, z, important ? 900 : 360); }
 function slumHouse(x, z, angle = 0) { const w = rand(5, 10), d = rand(5, 9), h = rand(3, 6); const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle + rand(-.08, .08); world.add(g); box(0, h / 2, 0, w, h, d, pick([0x4f4238, 0x5d4b39, 0x6d5237]), "", g); const roof = box(0, h + .45, 0, w * 1.1, .8, d * 1.05, pick([0x2d2520, 0x3b2a1e, 0x4d2f28]), "", g); roof.rotation.z = rand(-.08, .08); const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, "slumHouse"); cull(g, x, z, 340); }
@@ -409,7 +551,7 @@ function addCaravan(x, z) { const g = cart(); g.position.set(x, 0, z); g.rotatio
 function cart() { const g = new THREE.Group(); box(0, .55, 0, 2.8, .8, 1.6, 0x70482c, "", g); const h = createHorse(); h.position.set(0, 0, -1.55); g.add(h); for (const sx of [-1.3, 1.3]) for (const sz of [-.7, .7]) { const w = add(new THREE.TorusGeometry(.36, .07, 8, 18), mat(0x2c2018), g); w.position.set(sx, .35, sz); w.rotation.y = Math.PI / 2; } return g; }
 function createHorse() { const g = new THREE.Group(); box(0, .78, 0, 1.15, .55, .38, 0x5b3a28, "", g); const neck = box(.5, 1.05, 0, .25, .55, .22, 0x5b3a28, "", g); neck.rotation.z = -.35; box(.75, 1.25, 0, .35, .25, .25, 0x5b3a28, "", g); for (const x of [-.38, .38]) for (const z of [-.14, .14]) box(x, .34, z, .12, .65, .12, 0x3b281d, "", g); return g; }
 function createBeast() { const g = new THREE.Group(); box(0, .62, 0, .95, .42, .36, 0x111015, "", g); box(-.58, .72, 0, .36, .28, .32, 0x09090d, "", g); box(-.76, .61, 0, .22, .1, .28, 0x3a0c0c, "", g); return g; }
-function addNpc(variant, x, z, color, name, dialogue) { const n = createPerson(variant, color); n.position.set(x, 0, z); n.userData = { kind: "npc", id: dialogue, name, dialogue, r: .8 }; const lab = label(name); lab.position.set(0, 2.55, 0); lab.scale.set(1.6, .4, 1); n.add(lab); scene.add(n); npcs.push(n); return n; }
+function addNpc(variant, x, z, color, name, dialogue, options = {}) { return addHumanNpc(variant, x, z, color, name, dialogue, options); }
 function pCfg(v) { const C = {
   player: { legs: 0x2c3550, boot: 0x39281c, hairStyle: "short", hair: 0x2b2118, eye: 0x3a5a8c, scale: 1, collar: 0x394a63 },
   receptionist: { legs: 0x3a3f4a, boot: 0x2a2a2e, hairStyle: "bun", over: "vest", overCol: 0x4a5260, collar: 0xeae2d2, eye: 0x5a6b3e },

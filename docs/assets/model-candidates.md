@@ -35,8 +35,19 @@ Candidate NPC mapping for a later model PR:
 | Academy teacher | `Exports/glTF (Godot-Unreal)/Outfits/Female_Ranger.gltf` or `Male_Ranger.gltf` | glTF | Not directly | Stronger fantasy silhouette; may suit a senior mage/teacher after color/material pass |
 | Innkeeper | `Exports/glTF (Godot-Unreal)/Outfits/Female_Peasant.gltf` | glTF | Not directly | Peasant outfit is closest to an inn/tavern worker |
 
+Current runtime NPC pool:
+
+| NPC role | Runtime key(s) | Runtime files | Notes |
+|---|---|---|---|
+| Receptionist / innkeeper / academy teacher | `guildReceptionist`, `innMarta`, `academyTeacher` | `assets/models/characters/guild_receptionist/*.gltf` | Female peasant set with role-specific tints |
+| Guildmaster / priest / guards | `guildmaster`, `priest`, `guard` | `assets/models/characters/male_common/*.gltf` | Male peasant set with role-specific tints |
+| Adventurers | `adventurerMale`, `adventurerFemale` | Both prepared runtime sets | Budgeted pool replacement for guild/city adventurers |
+| Merchants / shopkeepers | `merchantMale`, `merchantFemale` | Both prepared runtime sets | Budgeted pool replacement for market and shop NPCs |
+| Students / townsfolk / faithful / slum residents | `studentMale`, `studentFemale`, `townsfolkMale`, `townsfolkFemale`, `faithful`, `slumResident` | Both prepared runtime sets | Ambient crowds use a smaller model budget in Low mode |
+| Blacksmith / noble | `blacksmith`, `noble` | `assets/models/characters/male_common/*.gltf` | Named/fixed NPCs are prioritized over crowds |
+
 Recommended next step:
 
-- Convert the receptionist composition to a single Blender-authored GLB.
-- Expand the same pipeline to `academy_teacher` and `inn_marta` only after the
-  receptionist pass is reviewed.
+- Convert the shared compositions to Blender-authored GLB files.
+- Remove hidden base body parts and author an A-pose or idle animation to reduce
+  the current static T-pose limitation.

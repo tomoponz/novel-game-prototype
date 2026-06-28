@@ -11,6 +11,13 @@
   box-shadow: 0 14px 34px rgba(0,0,0,.30);
   backdrop-filter: blur(12px);
   pointer-events: none;
+  transition: width .2s ease, padding .2s ease, background .2s ease;
+}
+
+.next-destination-panel.is-expanded {
+  width: min(460px, calc(100vw - 36px));
+  padding: 14px 16px;
+  background: rgba(5, 7, 11, .78);
 }
 
 .next-label {
@@ -47,10 +54,28 @@
   background: rgba(0,0,0,.24);
 }
 
+.next-destination-panel.is-expanded .mini-map-canvas {
+  height: 300px;
+}
+
 .mini-map-caption {
   margin: 6px 0 0;
   color: rgba(246,239,225,.58);
   font: 10.5px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.next-destination-panel.is-expanded .mini-map-caption::after {
+  content: "  /  M: shrink";
+  color: rgba(216,179,107,.8);
+}
+
+body:not(.ui-dialogue):not(.ui-menu) .next-destination-panel::after {
+  content: "M: map";
+  position: absolute;
+  right: 12px;
+  top: 9px;
+  color: rgba(246,239,225,.42);
+  font: 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 body.ui-dialogue .next-destination-panel,
@@ -65,8 +90,14 @@ body.ui-menu .next-destination-panel {
     width: min(240px, calc(100vw - 20px));
     padding: 10px 12px;
   }
+  .next-destination-panel.is-expanded {
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
   .next-destination-label { font-size: 12px; }
   .next-destination-area { font-size: 10px; }
   .mini-map-canvas { height: 118px; }
+  .next-destination-panel.is-expanded .mini-map-canvas { height: 230px; }
   .mini-map-caption { font-size: 9.5px; }
 }

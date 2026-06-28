@@ -144,6 +144,18 @@ h2 {
 .spell-row meter::-webkit-meter-bar { border: 0; border-radius: 999px; background: rgba(255,255,255,.12); }
 .spell-row meter::-webkit-meter-optimum-value { border-radius: 999px; background: linear-gradient(90deg, #ff7a1c, #ffd06b); }
 .spell-row meter::-moz-meter-bar { border-radius: 999px; background: linear-gradient(90deg, #ff7a1c, #ffd06b); }
+.quality-row { display: grid; grid-template-columns: 74px 1fr; align-items: center; gap: 8px; }
+.quality-row, .quality-row select { pointer-events: auto; }
+.quality-row span { color: rgba(246,239,225,.78); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.quality-row select {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 8px;
+  padding: 4px 7px;
+  color: var(--paper);
+  background: rgba(255,255,255,.10);
+  font: inherit;
+}
 
 .interact-hint {
   position: fixed;

@@ -1,5 +1,6 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+import { clone as cloneSkeleton } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/SkeletonUtils.js";
 
 const $ = (id) => document.getElementById(id);
 const data = window.GAME_DATA || {};
@@ -38,16 +39,19 @@ const audio = createAudioManager({
 });
 const modelLoader = new GLTFLoader();
 const modelCache = new Map();
+const RECEP_DIR = "assets/models/characters/guild_receptionist/";
+const FEMALE_PEASANT_PARTS = [RECEP_DIR + "base.gltf", RECEP_DIR + "outfit.gltf", RECEP_DIR + "hair.gltf"];
+// 共通素材参照: 現状の準備済みランタイムは女性ピーザント1セットのみ。女性系NPCはこれを色替えで流用し、
+// 男性系NPC(ギルドマスター/衛兵/司祭)は別途男性ランタイムを参照する（assets/models/characters/male_common/）。
+const MALE_DIR = "assets/models/characters/male_common/";
+const MALE_PARTS = [MALE_DIR + "base.gltf", MALE_DIR + "outfit.gltf", MALE_DIR + "hair.gltf"];
 const CHARACTER_MODELS = {
-  guildReceptionist: {
-    parts: [
-      "assets/models/characters/guild_receptionist/base.gltf",
-      "assets/models/characters/guild_receptionist/outfit.gltf",
-      "assets/models/characters/guild_receptionist/hair.gltf"
-    ],
-    scale: 1.14,
-    rotationY: 0
-  }
+  guildReceptionist: { parts: FEMALE_PEASANT_PARTS, scale: 1.14, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x4a7a9c, hair: 0x6a4a2c } },
+  innMarta: { parts: FEMALE_PEASANT_PARTS, scale: 1.17, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x9a5a3a, hair: 0x5a3a22 } },
+  academyTeacher: { parts: FEMALE_PEASANT_PARTS, scale: 1.18, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x3a2e6a, hair: 0x2a2030 } },
+  guildmaster: { parts: MALE_PARTS, scale: 1.2, rotationY: 0, offset: { z: .25 }, tint: { outfit: 0x40485a, hair: 0x55504a } },
+  priest: { parts: MALE_PARTS, scale: 1.16, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0xddd6c2, hair: 0xb8b2a2 } },
+  guard: { parts: MALE_PARTS, scale: 1.18, rotationY: 0, offset: { z: .2 }, tint: { outfit: 0x6a6f7a, hair: 0x3a2c20 } }
 };
 
 const ROAD_LINES = {
@@ -287,11 +291,12 @@ function loadCharacterModel(key, urls) {
   }
   return modelCache.get(cacheKey).then((gltfs) => {
     const g = new THREE.Group();
-    gltfs.forEach((gltf) => g.add(gltf.scene.clone(true)));
+    gltfs.forEach((gltf) => g.add(cloneSkeleton(gltf.scene)));
     return g;
   });
 }
-function fitExternalNpcModel(model, scale) {
+function matKind(name) { name = (name || "").toLowerCase(); if (name.includes("hair") || name.includes("beard")) return "hair"; if (name.includes("eye")) return "eye"; if (name.includes("peasant") || name.includes("ranger") || name.includes("outfit") || name.includes("cloth") || name.includes("robe")) return "outfit"; return "skin"; }
+function fitExternalNpcModel(model, scale, tint) {
   model.scale.setScalar(scale);
   model.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(model);
@@ -301,18 +306,39 @@ function fitExternalNpcModel(model, scale) {
     obj.castShadow = Boolean(quality.shadow && qualityMode !== "low");
     obj.receiveShadow = false;
     obj.frustumCulled = true;
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    mats.filter(Boolean).forEach((m) => { m.roughness = Math.max(m.roughness || 0, .82); m.needsUpdate = true; });
+    const mats = (Array.isArray(obj.material) ? obj.material : [obj.material]).filter(Boolean);
+    mats.forEach((m) => { m.roughness = Math.max(m.roughness || 0, .82); if (tint && m.color) { const c = tint[matKind(m.name)]; if (c != null) m.color.setHex(c); } m.needsUpdate = true; });
   });
   return model;
+}
+const modelDebug = params.has("modelDebug");
+// 表示検証: meshが存在し、Box3の高さが妥当な範囲にあるか（崩壊/極小/巨大なら不合格）
+function verifyModelVisible(model) {
+  let meshes = 0; model.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) meshes++; });
+  if (meshes < 1) return { ok: false, reason: "no-mesh" };
+  const box = new THREE.Box3().setFromObject(model);
+  if (box.isEmpty()) return { ok: false, reason: "empty-box" };
+  const size = new THREE.Vector3(); box.getSize(size);
+  if (![size.x, size.y, size.z].every(Number.isFinite)) return { ok: false, reason: "non-finite" };
+  if (size.y < 1.0 || size.y > 3.5) return { ok: false, reason: "h" + size.y.toFixed(2) };
+  return { ok: true, height: size.y };
+}
+function setModelStatus(n, modelKey, status, reason) {
+  n.userData.modelStatus = status;
+  try { document.body.dataset[modelKey + "Model"] = status; } catch {}
+  if (modelDebug) addModelDebugTag(n, status + (reason ? ":" + reason : ""));
+}
+function addModelDebugTag(n, text) {
+  const old = n.getObjectByName("__dbgTag"); if (old) { n.remove(old); old.material?.map?.dispose?.(); }
+  const tag = label("GLTF " + text); tag.name = "__dbgTag"; tag.position.set(0, 3.05, 0); tag.scale.set(2.0, .5, 1);
+  n.add(tag);
 }
 function placeModelNpc(modelKey, fallbackVariant, x, z, color, name, dialogue, options = {}) {
   const def = CHARACTER_MODELS[modelKey];
   const n = new THREE.Group();
   n.position.set(x, 0, z);
-  n.rotation.y = options.rotationY ?? 0;
+  n.rotation.y = options.rotationY ?? def?.npcRotationY ?? 0;
   n.userData = { kind: "npc", id: dialogue, name, dialogue, r: .8, modelKey, modelStatus: "loading" };
-  if (modelKey === "guildReceptionist") document.body.dataset.guildReceptionistModel = "loading";
   const fallback = createPerson(fallbackVariant, color);
   fallback.userData.isModelFallback = true;
   n.add(fallback);
@@ -322,31 +348,33 @@ function placeModelNpc(modelKey, fallbackVariant, x, z, color, name, dialogue, o
   n.add(lab);
   scene.add(n);
   npcs.push(n);
-  if (!def) { n.userData.modelStatus = "fallback"; if (modelKey === "guildReceptionist") document.body.dataset.guildReceptionistModel = "fallback"; return n; }
+  setModelStatus(n, modelKey, "loading");
+  if (!def) { setModelStatus(n, modelKey, "fallback", "no-def"); return n; }
+  const targetMap = options.map || state.map;
   loadCharacterModel(modelKey, def.parts).then((model) => {
-    if (!n.parent || state.map !== (options.map || state.map)) return;
-    n.remove(fallback);
+    if (!n.parent || state.map !== targetMap) return; // マップが変わっていたら破棄
     model.rotation.y = def.rotationY || 0;
-    n.add(fitExternalNpcModel(model, def.scale || 1));
-    n.userData.modelStatus = "loaded";
-    if (modelKey === "guildReceptionist") document.body.dataset.guildReceptionistModel = "loaded";
-  }).catch(() => {
-    n.userData.modelStatus = "fallback";
-    if (modelKey === "guildReceptionist") document.body.dataset.guildReceptionistModel = "fallback";
-  });
+    const fitted = fitExternalNpcModel(model, def.scale || 1, def.tint);
+    const v = verifyModelVisible(fitted);
+    if (!v.ok) { setModelStatus(n, modelKey, "invalid-box", v.reason); return; } // 表示検証NG → fallback維持
+    if (def.offset) fitted.position.set((def.offset.x || 0), fitted.position.y + (def.offset.y || 0), (def.offset.z || 0));
+    n.remove(fallback);
+    n.add(fitted);
+    setModelStatus(n, modelKey, "loaded");
+  }).catch(() => setModelStatus(n, modelKey, "fallback", "load-error"));
   return n;
 }
-function buildForestRoad() { setEnv(0x6f91a1, 40, quality.fog); bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 }; ground(210, 290, 0x35513d); road(0, 0, 9, 260, 0x746756, "dirt"); for (let z = -120; z <= 120; z += 18) { road(-15, z, 20, 3, 0x665b4f, "dirt"); road(16, z + 8, 18, 2.8, 0x665b4f, "dirt"); } for (let i = 0; i < Math.floor(180 * quality.houses); i++) addTree((Math.random() < .5 ? -1 : 1) * rand(12, 86), rand(-128, 128), rand(.8, 1.4), true); for (let i = 0; i < Math.floor(60 * quality.props); i++) addRock(rand(-85, 85), rand(-125, 125), rand(.3, .8)); addGate(0, -112); addCaravan(6, 15); addSign(7, -90, "ROYAL CAPITAL"); locations.push({ id: "gate", name: "北門の検問を受ける", x: 0, z: -108, r: 6, dialogue: "north_gate" }, { id: "caravan", name: done("merchant") ? "救助済みの荷車を見る" : "荷車襲撃現場を見る", x: 6, z: 15, r: 6, dialogue: "caravan_attack" }); for (let i = 0; i < 5; i++) addNpc("guard", rand(-8, 8), rand(-70, 45), 0xb77954, "北門衛兵", "north_gate"); }
+function buildForestRoad() { setEnv(0x6f91a1, 40, quality.fog); bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 }; ground(210, 290, 0x35513d); road(0, 0, 9, 260, 0x746756, "dirt"); for (let z = -120; z <= 120; z += 18) { road(-15, z, 20, 3, 0x665b4f, "dirt"); road(16, z + 8, 18, 2.8, 0x665b4f, "dirt"); } for (let i = 0; i < Math.floor(180 * quality.houses); i++) addTree((Math.random() < .5 ? -1 : 1) * rand(12, 86), rand(-128, 128), rand(.8, 1.4), true); for (let i = 0; i < Math.floor(60 * quality.props); i++) addRock(rand(-85, 85), rand(-125, 125), rand(.3, .8)); addGate(0, -112); addCaravan(6, 15); addSign(7, -90, "ROYAL CAPITAL"); locations.push({ id: "gate", name: "北門の検問を受ける", x: 0, z: -108, r: 6, dialogue: "north_gate" }, { id: "caravan", name: done("merchant") ? "救助済みの荷車を見る" : "荷車襲撃現場を見る", x: 6, z: 15, r: 6, dialogue: "caravan_attack" }); placeModelNpc("guard", "guard", 4, -98, 0xb77954, "北門衛兵", "north_gate", { map: "forestRoad" }); for (let i = 0; i < 4; i++) addNpc("guard", rand(-8, 8), rand(-70, 45), 0xb77954, "北門衛兵", "north_gate"); }
 function buildCity() { setEnv(0xbcd6e6, 130, 1500); bounds = { minX: -680, maxX: 680, minZ: -680, maxZ: 680 }; ground(1420, 1420, 0x6f8a52, "grass"); const floor = add(new THREE.PlaneGeometry(1330, 1330), surfaceMat("dirt", 90, 90), world, false, true); floor.rotation.x = -Math.PI / 2; floor.position.y = .012; cityWall(); road(0, 0, 24, 1240, 0x817767); road(0, 0, 1240, 24, 0x817767); for (const z of [-330, -130, 130, 330, 430]) road(0, z, 980, 9, 0x6f6657); for (const x of [-430, -330, -130, 130, 330, 430]) road(x, 0, 9, 980, 0x6f6657); castleHill(); centralPlaza(); guildDistrict(135, -70); churchDistrict(-185, -85); academyDistrict(-300, -60); marketDistrict(285, 85); craftDistrict(350, -125); nobleDistrict(-250, -350); slumDistrict(-410, 245); trainingDistrict(380, 330); gateDistrict(0, 610); shoppingStreet(); cityFill(); buildHouseBatch(facadeSpecs, true); buildHouseBatch(plainSpecs, false); traffic(); pedestrians(); props(); streetDressing(); addSign(0, 610, "NORTH GATE"); addSign(135, -38, "GUILD"); addSign(-185, -48, "CHURCH"); addSign(-300, -42, "ACADEMY"); addSign(285, 125, "MARKET"); addSign(-390, 235, "ALLEY"); locations.push({ id: "plaza", name: "中央広場を見渡す", x: 0, z: 40, r: 12, dialogue: "plaza" }, { id: "guild", name: "冒険者ギルドに入る", x: 135, z: -60, r: 10, dialogue: "guild" }, { id: "market", name: "市場の盗難騒ぎを見る", x: 260, z: 95, r: 13, dialogue: "market" }, { id: "church", name: "教会記録所で相談する", x: -185, z: -70, r: 12, dialogue: "church" }, { id: "training", name: "外門練習場へ行く", x: 360, z: 330, r: 13, dialogue: "training_gate" }, { id: "alley", name: "怪しい路地裏に入る", x: -390, z: 235, r: 12, dialogue: "alley" }, { id: "blacksmith", name: "鍛冶屋に近づく", x: 330, z: -110, r: 9, dialogue: "blacksmith" }); }
-function buildGuildHall() { setEnv(0x1f1711, 12, 36); bounds = { minX: -8, maxX: 8, minZ: -7, maxZ: 7 }; ground(16, 15, 0x4c3727, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.9)); const torch = new THREE.PointLight(0xffb86a, 8, 22, 2); torch.position.set(0, 3.6, -2); world.add(torch); room(16, 15, 3.2, 0x3a281c); box(0, .55, -4.5, 6.4, 1.1, .9, 0x6b4a2f, "counter", world, true); box(0, 1.2, -6.2, 5.6, 2.4, .5, 0x5a3d27, "shelf", world, true); addQuestBoard(-5.6, -4.4); const crystal = add(new THREE.SphereGeometry(.45, 16, 10), mat(0x80d8ff, .2, 0x65cfff, .9), world, false, false); crystal.position.set(3.6, 1.15, -3.4); cull(crystal, 3.6, -3.4, 60); cyl(3.6, .55, -3.4, .32, .8, 0x62513a, "crystalBase", world, true); placeModelNpc("guildReceptionist", "receptionist", 0, -3.3, 0xd8b36b, "受付", "guild_reception", { map: "guildHall" }); addNpc("guildmaster", -3.8, -3.4, 0x4f5d6f, "ギルドマスター", "guildmaster"); addNpc("adventurer", -3.8, .9, 0x8c6f4f, "冒険者", "generic"); locations.push({ id: "reception", name: "受付で登録申請をする", x: 0, z: -3.3, r: 3, dialogue: "guild_reception" }, { id: "crystal", name: "魔力測定水晶に触れる", x: 3.6, z: -3.4, r: 2.6, dialogue: "mana_measure" }, { id: "guildmaster", name: "ギルドマスターと話す", x: -3.8, z: -3.4, r: 2.8, dialogue: "guildmaster" }, { id: "guild_exit", name: "王都へ戻る", x: 0, z: 6.7, r: 2.4, targetMap: "plaza", spawn: { x: 135, z: -42 } }); }
-function buildChurch() { setEnv(0x151823, 12, 36); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x5b5a55, "stone"); world.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1d28, 1.7)); const glow = new THREE.PointLight(0xbfd4ff, 6, 20, 2); glow.position.set(0, 3.4, -3); world.add(glow); room(14, 14, 4, 0x44434a); box(0, .55, -4.4, 3.8, 1.05, 1.25, 0xddd1ae, "altar", world, true); for (let i = 0; i < 4; i++) { box(-2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); box(2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); } addNpc("priest", 0, -2.5, 0xc9c4ad, "司祭", "church"); }
-function buildTrainingGround() { setEnv(0x88a6b4, 25, 180); bounds = { minX: -60, maxX: 60, minZ: -70, maxZ: 70 }; ground(130, 150, 0x556c4c); road(0, 0, 18, 130, 0x776b5a); for (let i = 0; i < 16; i++) cyl(rand(-35, 35), .85, rand(-40, 40), .25, 1.7, 0x7a5635, "target"); addSign(0, 48, "TO CAPITAL"); addNpc("guard", -8, 12, 0xb77954, "訓練教官", "training"); addNpc("adventurer", 10, -8, 0x6f8aa6, "模擬戦相手", "mock_battle"); locations.push({ id: "practice", name: "火球制御を練習する", x: -8, z: 12, r: 4, dialogue: "training" }, { id: "mock", name: "翌日の模擬戦を受ける", x: 10, z: -8, r: 4, dialogue: "mock_battle" }, { id: "training_exit", name: "王都へ戻る", x: 0, z: 52, r: 4, targetMap: "plaza", spawn: { x: 360, z: 305 } }); }
-function buildAcademy() { setEnv(0x1a1c28, 12, 42); bounds = { minX: -9, maxX: 9, minZ: -8, maxZ: 8 }; ground(18, 16, 0x4a4640, "stone"); world.add(new THREE.HemisphereLight(0xcfd8f0, 0x20222e, 1.85)); const glow = new THREE.PointLight(0xbfd0ff, 7, 26, 2); glow.position.set(0, 4, -2); world.add(glow); room(18, 16, 3.8, 0x383a48); box(0, .6, -5.2, 6, 1.2, 1, 0x5a4a36, "lectern", world, true); for (let i = 0; i < 3; i++) { box(-7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); box(7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); } const orb = add(sphGeo(.5, 16, 12), mat(0x8fd2ff, .2, 0x6fb8ff, 1.0), world, false, false); orb.position.set(0, 2.3, -3.6); cull(orb, 0, -3.6, 70); cyl(0, .55, -3.6, .34, .8, 0x55607a, "orbBase", world, true); cyl(4.6, .9, 2.6, .3, 1.8, 0x7a5635, "target", world, true); for (let i = 0; i < 4; i++) box(-3 + i * 2, .35, 4.5, 1.6, .6, 1, 0x4a3a2a, "bench", world, true); addNpc("teacher", 0, -3.7, 0x3a2e5a, "魔法学院 教師", "academy_teacher"); addNpc("student", -3.2, 1.4, 0x2e3a5c, "学院生", "academy_student"); addNpc("student", 3.4, .8, 0x2e3a5c, "学院生", "academy_student"); locations.push({ id: "academy_teacher", name: "教師と話す", x: 0, z: -3.7, r: 3, dialogue: "academy_teacher" }, { id: "academy_orb", name: "魔導具を調べる", x: 0, z: -3.6, r: 2.6, dialogue: "academy_orb" }, { id: "academy_exit", name: "王都へ戻る", x: 0, z: 7.2, r: 2.4, targetMap: "plaza", spawn: { x: -300, z: -88 } }); }
+function buildGuildHall() { setEnv(0x1f1711, 12, 36); bounds = { minX: -8, maxX: 8, minZ: -7, maxZ: 7 }; ground(16, 15, 0x4c3727, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.9)); const torch = new THREE.PointLight(0xffb86a, 8, 22, 2); torch.position.set(0, 3.6, -2); world.add(torch); room(16, 15, 3.2, 0x3a281c); box(0, .55, -4.5, 6.4, 1.1, .9, 0x6b4a2f, "counter", world, true); box(0, 1.2, -6.2, 5.6, 2.4, .5, 0x5a3d27, "shelf", world, true); addQuestBoard(-5.6, -4.4); const crystal = add(new THREE.SphereGeometry(.45, 16, 10), mat(0x80d8ff, .2, 0x65cfff, .9), world, false, false); crystal.position.set(3.6, 1.15, -3.4); cull(crystal, 3.6, -3.4, 60); cyl(3.6, .55, -3.4, .32, .8, 0x62513a, "crystalBase", world, true); placeModelNpc("guildReceptionist", "receptionist", 0, -3.3, 0xd8b36b, "受付", "guild_reception", { map: "guildHall" }); placeModelNpc("guildmaster", "noble", -3.8, -3.4, 0x4f5d6f, "ギルドマスター", "guildmaster", { map: "guildHall" }); addNpc("adventurer", -3.8, .9, 0x8c6f4f, "冒険者", "generic"); locations.push({ id: "reception", name: "受付で登録申請をする", x: 0, z: -3.3, r: 3, dialogue: "guild_reception" }, { id: "crystal", name: "魔力測定水晶に触れる", x: 3.6, z: -3.4, r: 2.6, dialogue: "mana_measure" }, { id: "guildmaster", name: "ギルドマスターと話す", x: -3.8, z: -3.4, r: 2.8, dialogue: "guildmaster" }, { id: "guild_exit", name: "王都へ戻る", x: 0, z: 6.7, r: 2.4, targetMap: "plaza", spawn: { x: 135, z: -42 } }); }
+function buildChurch() { setEnv(0x151823, 12, 36); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x5b5a55, "stone"); world.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1d28, 1.7)); const glow = new THREE.PointLight(0xbfd4ff, 6, 20, 2); glow.position.set(0, 3.4, -3); world.add(glow); room(14, 14, 4, 0x44434a); box(0, .55, -4.4, 3.8, 1.05, 1.25, 0xddd1ae, "altar", world, true); for (let i = 0; i < 4; i++) { box(-2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); box(2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); } placeModelNpc("priest", "priest", 0, -2.5, 0xc9c4ad, "司祭", "church", { map: "church" }); }
+function buildTrainingGround() { setEnv(0x88a6b4, 25, 180); bounds = { minX: -60, maxX: 60, minZ: -70, maxZ: 70 }; ground(130, 150, 0x556c4c); road(0, 0, 18, 130, 0x776b5a); for (let i = 0; i < 16; i++) cyl(rand(-35, 35), .85, rand(-40, 40), .25, 1.7, 0x7a5635, "target"); addSign(0, 48, "TO CAPITAL"); placeModelNpc("guard", "guard", -8, 12, 0xb77954, "訓練教官", "training", { map: "trainingGround" }); addNpc("adventurer", 10, -8, 0x6f8aa6, "模擬戦相手", "mock_battle"); locations.push({ id: "practice", name: "火球制御を練習する", x: -8, z: 12, r: 4, dialogue: "training" }, { id: "mock", name: "翌日の模擬戦を受ける", x: 10, z: -8, r: 4, dialogue: "mock_battle" }, { id: "training_exit", name: "王都へ戻る", x: 0, z: 52, r: 4, targetMap: "plaza", spawn: { x: 360, z: 305 } }); }
+function buildAcademy() { setEnv(0x1a1c28, 12, 42); bounds = { minX: -9, maxX: 9, minZ: -8, maxZ: 8 }; ground(18, 16, 0x4a4640, "stone"); world.add(new THREE.HemisphereLight(0xcfd8f0, 0x20222e, 1.85)); const glow = new THREE.PointLight(0xbfd0ff, 7, 26, 2); glow.position.set(0, 4, -2); world.add(glow); room(18, 16, 3.8, 0x383a48); box(0, .6, -5.2, 6, 1.2, 1, 0x5a4a36, "lectern", world, true); for (let i = 0; i < 3; i++) { box(-7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); box(7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); } const orb = add(sphGeo(.5, 16, 12), mat(0x8fd2ff, .2, 0x6fb8ff, 1.0), world, false, false); orb.position.set(0, 2.3, -3.6); cull(orb, 0, -3.6, 70); cyl(0, .55, -3.6, .34, .8, 0x55607a, "orbBase", world, true); cyl(4.6, .9, 2.6, .3, 1.8, 0x7a5635, "target", world, true); for (let i = 0; i < 4; i++) box(-3 + i * 2, .35, 4.5, 1.6, .6, 1, 0x4a3a2a, "bench", world, true); placeModelNpc("academyTeacher", "teacher", 0, -3.7, 0x3a2e5a, "魔法学院 教師", "academy_teacher", { map: "academy" }); addNpc("student", -3.2, 1.4, 0x2e3a5c, "学院生", "academy_student"); addNpc("student", 3.4, .8, 0x2e3a5c, "学院生", "academy_student"); locations.push({ id: "academy_teacher", name: "教師と話す", x: 0, z: -3.7, r: 3, dialogue: "academy_teacher" }, { id: "academy_orb", name: "魔導具を調べる", x: 0, z: -3.6, r: 2.6, dialogue: "academy_orb" }, { id: "academy_exit", name: "王都へ戻る", x: 0, z: 7.2, r: 2.4, targetMap: "plaza", spawn: { x: -300, z: -88 } }); }
 function academyDistrict(x, z) { house(x, z, 40, 28, 20, 0x8a8fb0, "ACADEMY", true, faceToward(0, 1)); box(x + 23, 14, z - 2, 12, 28, 12, 0x9296b6, "academy", world, true); const tr = add(coneGeo(9, 17, 6), mat(0x3a4a78), world, true); tr.position.set(x + 23, 30.5, z - 2); cull(tr, x + 23, z, 1300); for (const s of [-1, 1]) { cyl(x + s * 11, 4, z + 16, .2, 8, 0x4a4632, "", world); box(x + s * 11, 5.4, z + 16, .3, 5, 2.4, 0x3a4a8c, "", world); } for (let i = 0; i < 5; i++) addNpc("student", x + rand(-17, 17), z + rand(19, 32), 0x2e3a5c, "学院生", "academy_student"); addNpc("teacher", x + 7, z + 16, 0x3a2e5a, "学院門衛", "academy_gate"); locations.push({ id: "academy", name: "魔法学院に入る", x: x, z: z + 16, r: 11, dialogue: "academy_gate" }); }
 const SHOP_T = { weapon: { name: "武器屋", wall: 0x6a5a4a, accent: 0x8a9098, keeper: "blacksmith", kname: "武器屋の主", dlg: "shop_weapon" }, armor: { name: "防具屋", wall: 0x5a6068, accent: 0xb6bcc6, keeper: "merchant", kname: "防具屋の主", dlg: "shop_armor" }, potion: { name: "薬屋", wall: 0x4a6a5a, accent: 0x6fcf8f, keeper: "merchant", kname: "薬師", dlg: "shop_potion" }, magicshop: { name: "魔法具店", wall: 0x4a4a6a, accent: 0x8fbfff, keeper: "teacher", kname: "魔法具商", dlg: "shop_magic" }, bakery: { name: "パン屋", wall: 0x8a6a44, accent: 0xe0b870, keeper: "merchant", kname: "パン屋", dlg: "shop_bakery" }, inn: { name: "宿屋 曲がった匙亭", wall: 0x7a5a3a, accent: 0xd8b36b, keeper: "merchant", kname: "女将マルタ", dlg: "inn_gate", enter: 1 }, tavern: { name: "酒場", wall: 0x6a4438, accent: 0xc8763a, keeper: "merchant", kname: "酒場の主", dlg: "shop_tavern" }, records: { name: "記録所", wall: 0x6a6458, accent: 0xd8c89a, keeper: "noble", kname: "記録官", dlg: "shop_records" } };
 function shopfront(x, z, angle, type) { const T = SHOP_T[type]; house(x, z, 16, 13, rand(8, 11), T.wall, T.name, true, angle); const fx = Math.sin(angle), fz = Math.cos(angle); const aw = box(x + fx * 6.6, 2.6, z + fz * 6.6, 4.4, .16, 1.6, T.accent, "", world); aw.rotation.y = angle; addNpc(T.keeper, x + fx * 7.4, z + fz * 7.4, T.wall, T.kname, T.dlg); shopAnchors.push([x, z, 13]); if (T.enter) locations.push({ id: T.dlg, name: T.name + "に入る", x: x + fx * 6.8, z: z + fz * 6.8, r: 5, dialogue: T.dlg }); }
 function shoppingStreet() { for (const [t, x] of [["weapon", 70], ["armor", 110], ["potion", 150], ["magicshop", 190]]) shopfront(x, -22, faceToward(0, 1), t); for (const [t, x] of [["inn", 70], ["tavern", 110], ["records", 150], ["bakery", 190]]) shopfront(x, 22, faceToward(0, -1), t); for (let i = 0; i < 6; i++) { lamp(52 + i * 28, -11); lamp(52 + i * 28, 11); } for (let i = 0; i < 5; i++) addNpc(pick(["merchant", "traveler", "adventurer"]), rand(55, 200), rand(-10, 10), pick([0x8c6f4f, 0x7f9fbd, 0x6f8aa6]), "通行人", "townsfolk"); }
-function buildInn() { setEnv(0x241a16, 12, 38); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x4a3a2a, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.85)); const t = new THREE.PointLight(0xffb86a, 8, 22, 2); t.position.set(0, 3.4, -1); world.add(t); room(14, 14, 3.6, 0x3a2a22); box(0, .6, -4.6, 5.4, 1.2, 1.1, 0x6a4a2c, "counter", world, true); for (let i = 0; i < 3; i++) box(-4.5 + i * 4.5, .4, 3.8, 2.4, .7, 1.4, 0x5a4632, "table", world, true); for (const [bx, bz] of [[-2, -2.6], [2, -2.6]]) box(bx, .35, bz, 2, .6, 1.6, 0x4a3320, "bench", world, true); addNpc("merchant", 0, -3.4, 0xd8b36b, "女将マルタ", "inn_marta"); addNpc("adventurer", -3.6, 2, pick([0x8c6f4f, 0x58718d]), "酒場の客", "townsfolk"); addNpc("slum", 3.6, 2.4, 0x6a5a4a, "酔っ払い", "townsfolk"); locations.push({ id: "inn_marta", name: "女将マルタと話す", x: 0, z: -3.4, r: 3, dialogue: "inn_marta" }, { id: "inn_exit", name: "外へ出る", x: 0, z: 6.4, r: 2.4, targetMap: "plaza", spawn: { x: 70, z: 30 } }); }
+function buildInn() { setEnv(0x241a16, 12, 38); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x4a3a2a, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.85)); const t = new THREE.PointLight(0xffb86a, 8, 22, 2); t.position.set(0, 3.4, -1); world.add(t); room(14, 14, 3.6, 0x3a2a22); box(0, .6, -4.6, 5.4, 1.2, 1.1, 0x6a4a2c, "counter", world, true); for (let i = 0; i < 3; i++) box(-4.5 + i * 4.5, .4, 3.8, 2.4, .7, 1.4, 0x5a4632, "table", world, true); for (const [bx, bz] of [[-2, -2.6], [2, -2.6]]) box(bx, .35, bz, 2, .6, 1.6, 0x4a3320, "bench", world, true); placeModelNpc("innMarta", "merchant", 0, -3.4, 0xd8b36b, "女将マルタ", "inn_marta", { map: "inn" }); addNpc("adventurer", -3.6, 2, pick([0x8c6f4f, 0x58718d]), "酒場の客", "townsfolk"); addNpc("slum", 3.6, 2.4, 0x6a5a4a, "酔っ払い", "townsfolk"); locations.push({ id: "inn_marta", name: "女将マルタと話す", x: 0, z: -3.4, r: 3, dialogue: "inn_marta" }, { id: "inn_exit", name: "外へ出る", x: 0, z: 6.4, r: 2.4, targetMap: "plaza", spawn: { x: 70, z: 30 } }); }
 
 function cityWall() { for (const [x, z, w, d] of [[0, -675, 1320, 10], [0, 675, 1320, 10], [-675, 0, 10, 1320], [675, 0, 10, 1320]]) box(x, 5, z, w, 10, d, 0x6d6c64, "wall", world, true); for (let i = -620; i <= 620; i += 75) { box(i, 10, -675, 10, 18, 10, 0x74736b, "tower", world, true); box(i, 10, 675, 10, 18, 10, 0x74736b, "tower", world, true); box(-675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); box(675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); } }
 function addGate(x, z) { box(x, 4, z, 38, 8, 7, 0x6d6c64, "gate", world, true); box(x - 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); box(x + 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); }

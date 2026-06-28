@@ -1,0 +1,22 @@
+Male common runtime model (shared by guildmaster / priest / guard / instructor)
+
+Texture-stripped runtime composition built from Quaternius CC0 source assets
+already in this repository (same preparation as guild_receptionist: geometry +
+skin kept, large textures replaced with simple PBR baseColorFactor colors).
+Per-NPC differentiation is done at runtime via material color tints in
+game_world.js (CHARACTER_MODELS).
+
+Runtime files:
+- base.gltf / base.bin
+- outfit.gltf / outfit.bin
+- hair.gltf / hair.bin
+
+Source files:
+- assets/models/Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Male_FullBody.gltf (+ .bin)
+- assets/models/Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Male_Peasant.gltf (+ .bin)
+- assets/models/Universal Base Characters[Standard]/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)/Hair_SimpleParted.gltf (+ .bin)
+
+Notes:
+- Like the receptionist, this overlays the full base body under the outfit, so a
+  future Blender-authored single GLB should remove hidden body parts and bake an
+  A-pose for a cleaner final asset.

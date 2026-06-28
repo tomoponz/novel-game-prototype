@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Novel RPG Prototype</title>
   <link rel="stylesheet" href="style.css?v=ui-hud-town-polish-20260628b">
-  <link rel="stylesheet" href="next_destination.css?v=next-destination-panel-20260628">
+  <link rel="stylesheet" href="next_destination.css?v=minimap-navigation-upgrade-20260629">
 </head>
 <body>
   <main id="app">
@@ -17,7 +17,7 @@
         <h1>Novel RPG Prototype</h1>
         <p class="title-copy">森の街道で目覚め、荷車襲撃を越えて王都アウレリアへ入る。</p>
         <button id="start-btn" class="primary-button" type="button">Start</button>
-        <p class="title-hint">Esc：メニュー　1〜9：ホットバー</p>
+        <p class="title-hint">Esc：メニュー　1〜9：ホットバー　M：地図拡大</p>
       </div>
     </section>
 
@@ -112,6 +112,7 @@
               <li><kbd>E</kbd> 会話 / 入る</li>
               <li><kbd>J</kbd> 火球　<kbd>L</kbd> 強火球　<kbd>K</kbd> 回避</li>
               <li><kbd>T</kbd> 時間帯変更</li>
+              <li><kbd>M</kbd> ミニマップ拡大 / 縮小</li>
               <li><kbd>1〜9</kbd> ホットバー選択</li>
               <li><kbd>Esc</kbd> メニュー / 会話を閉じる</li>
             </ul>
@@ -140,7 +141,7 @@
   </main>
 
   <script src="story.js"></script>
-  <script src="next_destination.js?v=next-destination-panel-20260628b"></script>
+  <script src="next_destination.js?v=minimap-navigation-upgrade-20260629"></script>
   <script>
     (() => {
       const rawDpr = window.devicePixelRatio || 1;

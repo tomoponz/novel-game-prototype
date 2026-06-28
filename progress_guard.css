@@ -1,0 +1,47 @@
+.progress-guard-toast {
+  position: fixed;
+  z-index: 18;
+  left: 50%;
+  top: 24%;
+  transform: translate(-50%, -8px);
+  width: min(520px, calc(100vw - 36px));
+  padding: 14px 18px;
+  border: 1px solid rgba(216,179,107,.42);
+  border-radius: 16px;
+  color: var(--paper);
+  background: rgba(7, 9, 15, .88);
+  box-shadow: 0 18px 46px rgba(0,0,0,.46);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .18s ease, visibility .18s ease, transform .18s ease;
+}
+
+.progress-guard-toast.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+.progress-guard-toast strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--gold);
+  font-size: 12px;
+  letter-spacing: .18em;
+}
+
+.progress-guard-toast span {
+  display: block;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (max-width: 820px) {
+  .progress-guard-toast {
+    top: 18%;
+    padding: 12px 14px;
+  }
+  .progress-guard-toast span { font-size: 13px; }
+}

@@ -8,7 +8,8 @@ claim that all items are solved.
 - General buildings still share too much of the same silhouette.
 - Some houses can read as simple block buildings.
 - Side alleys and narrow living roads are still sparse.
-- Pedestrians and carts can still pass through some scenery.
+- Pedestrians and carts can still pass through some scenery, though a lightweight
+  static-collider check now reduces obvious building penetration.
 - The minimap is still a text overview, not a real positional minimap.
 - Quest destination guidance is still mostly dialogue and markers.
 - The magic academy is not yet campus scale.
@@ -24,13 +25,14 @@ claim that all items are solved.
 | White wall and orange roof repetition | Adjusted ordinary wall and roof palettes toward more muted medieval variation |
 | Sparse inner roads | Added a small number of narrow visual alley paths around existing open district areas |
 | Abrupt time changes | Added a short light and sky transition for time-of-day changes |
+| NPC/cart building penetration | Added a small static-collider check with sidestep/route-advance fallback; this is not full pathfinding |
 
 ## Not Addressed In This PR
 
 | Item | Reason |
 |---|---|
 | Real minimap | Needs a separate UI and map-data pass |
-| NPC/cart avoidance | Needs pathing or steering logic |
+| Full NPC/cart avoidance | Needs pathing or steering logic |
 | Cart ambush action redesign | Larger combat/event change |
 | Permit and flag gate system | Larger progression-system change |
 | Academy campus expansion | Larger district expansion |

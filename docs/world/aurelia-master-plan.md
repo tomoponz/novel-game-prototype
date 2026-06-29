@@ -18,7 +18,7 @@ and the items below should be split into future, reviewable PRs.
 | Production Block | Intended Role |
 |---|---|
 | Central plaza and mixed streets | Current plaza hub, homes, small shops, inns, markets, routes, and civic signs |
-| Nearby facilities | Guild, inn, merchant office, backstreet, guard-facing services, and ordinary housing |
+| Nearby facilities | Guild, inn, merchant office, administrative street, backstreet, guard-facing services, and ordinary housing |
 | Large institutional approaches | Academy campus and cathedral grounds with nearby residents, shops, records, and side streets |
 | Royal/civic expansion | Castle approach, administration, guard plazas, estates, and the ordinary town around them |
 

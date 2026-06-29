@@ -63,12 +63,14 @@ Administration, commerce, academy, and church facilities can cluster by
 convenience, but homes, inns, shops, routes, and side alleys should remain mixed.
 
 Staging (each a separate future PR, no plaza replacement):
-1. Central plaza street cues + mixed city-life dressing (current Phase 1).
-2. Nearby facility depth for `guildHall`, `inn`, `merchantOffice`, and
+1. Central plaza street cues + mixed city-life dressing.
+2. `administrativeStreet`: permit bureau, records window, guard post, royal
+   approach cue, homes, stalls, and waiting citizens.
+3. Nearby facility depth for `guildHall`, `inn`, `merchantOffice`, and
    `backstreet`.
-3. Larger but still lightweight surroundings for `academyCampus` and
+4. Larger but still lightweight surroundings for `academyCampus` and
    `churchGrounds`.
-4. Additional lightweight submaps around the center until the playable capital
+5. Additional lightweight submaps around the center until the playable capital
    center is about four times the current scale.
 
 Constraints honored: no one-map 4x rebuild, no factional four-district split,
@@ -88,4 +90,4 @@ Status as of branch `feature/resolve-open-gameplay-issues-20260629`:
 | #14 | Fixed-NPC T-pose | Partial | Mixer infra plays idle clips if present; current CC0 assets have 0 clips, so T-pose remains (needs authored GLB). |
 | #15 | Academy campus map | Completed | New `academyCampus` map (gate/courtyard/lecture hall/tower/garden/yard) linking plaza ↔ academy interior. |
 | #16 | Cathedral grounds map | Completed | New `churchGrounds` map (cathedral/spires/stained glass/garden/fountain/records) linking plaza ↔ church interior. |
-| #17 | Capital scale expansion | Partial (Phase 1) | Central plaza street cues, mixed city-life dressing, flavor NPCs, and `capital-scale-expansion-plan.md`; no four-theme-district split or 4x rebuild. |
+| #17 | Capital scale expansion | Partial (Phase 2) | Added `administrativeStreet` as a mixed civic/living street with permit and record windows; no four-theme-district split or 4x rebuild. |

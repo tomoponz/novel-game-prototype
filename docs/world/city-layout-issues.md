@@ -48,40 +48,32 @@ claim that all items are solved.
 4. Expand the church into a cathedral courtyard scene.
 5. Convert the shared glTF NPC compositions into finalized GLB files with an
    A-pose or idle animation.
-6. Build the first outer block of the four-block Aurelia plan.
+6. Build the first capital-scale expansion block for Aurelia.
 
-## Staged Four-Block Plan (issue #17 — foundation only)
+## Staged Capital Scale Plan (issue #17 — foundation only)
 
-The full four-block rebuild is intentionally **not** implemented in this PR (too
-risky for a single change). Only the foundation is laid: directional signage near
-the central plaza now points at the intended district clusters so the staged plan
-is legible in-world, and the layout below documents the target.
+The four-block plan means a staged production unit for expanding central Aurelia
+to roughly four times the current playable scale. It does **not** mean four
+ideological, factional, or color-coded theme districts.
 
-Current plaza already seats districts at fixed anchors (kept as-is). The staged
-plan groups them into four outer blocks around the central high area:
-
-```
-                north — 北門 / 森の街道 (gate, forest road)
-                            |
- west — 学院区/教会区 ──  中央広場 (central high area)  ── east — 市場区/職人区
-   (academy, cathedral,        |                            (market, crafts,
-    records)              south — 王城 / 貴族区 (royal hill)   smithy)
-```
-
-- North block: gate district, caravan road approach.
-- South block: royal hill / castle terraces, noble quarter (central high area).
-- East block: market district + craft/smith district.
-- West block: academy district + cathedral/records district.
+The current plaza stays as the central hub. Phase 1 adds small street extensions,
+direction signs, modest shops, homes, props, and residents around the central
+plaza so the city feels like it continues beyond the first visible square.
+Administration, commerce, academy, and church facilities can cluster by
+convenience, but homes, inns, shops, routes, and side alleys should remain mixed.
 
 Staging (each a separate future PR, no plaza replacement):
-1. Signage + district legibility (this PR).
-2. Sub-map districts for academy (`academyCampus`) and cathedral
-   (`churchGrounds`) — landed in this PR as standalone maps.
-3. One outer block converted to denser, walk-through district streets.
-4. Remaining blocks, then unify minimap regions.
+1. Central plaza street cues + mixed city-life dressing (current Phase 1).
+2. Nearby facility depth for `guildHall`, `inn`, `merchantOffice`, and
+   `backstreet`.
+3. Larger but still lightweight surroundings for `academyCampus` and
+   `churchGrounds`.
+4. Additional lightweight submaps around the center until the playable capital
+   center is about four times the current scale.
 
-Constraints honored: plaza geometry unchanged, minimap unaffected, no heavy
-geometry added (signage only).
+Constraints honored: no one-map 4x rebuild, no factional four-district split,
+minimap/world-map compatibility maintained, and no heavy new asset dependency.
+The canonical definition now lives in `capital-scale-expansion-plan.md`.
 
 ## Implemented / Partially implemented open issues (#10–#17)
 
@@ -96,4 +88,4 @@ Status as of branch `feature/resolve-open-gameplay-issues-20260629`:
 | #14 | Fixed-NPC T-pose | Partial | Mixer infra plays idle clips if present; current CC0 assets have 0 clips, so T-pose remains (needs authored GLB). |
 | #15 | Academy campus map | Completed | New `academyCampus` map (gate/courtyard/lecture hall/tower/garden/yard) linking plaza ↔ academy interior. |
 | #16 | Cathedral grounds map | Completed | New `churchGrounds` map (cathedral/spires/stained glass/garden/fountain/records) linking plaza ↔ church interior. |
-| #17 | Four-block capital | Partial (foundation) | Directional signage + this staged plan doc; no city rebuild. |
+| #17 | Capital scale expansion | Partial (Phase 1) | Central plaza street cues, mixed city-life dressing, flavor NPCs, and `capital-scale-expansion-plan.md`; no four-theme-district split or 4x rebuild. |

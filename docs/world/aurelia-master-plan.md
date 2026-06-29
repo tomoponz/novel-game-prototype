@@ -7,19 +7,24 @@ and the items below should be split into future, reviewable PRs.
 ## Long-Term Scale
 
 - Treat the current walled city as one block of the final capital.
-- Expand Aurelia to roughly four blocks at the final prototype scale.
-- Place the four blocks around a central highland.
+- Expand central Aurelia to roughly four times the current playable scale through
+  staged production blocks.
+- These blocks are production units, not ideological or factional city quarters.
 - Put the royal castle on that highland so it is visibly above the lower town.
 - Keep the current city playable while expanding outward in phases.
 
-## Four-Block Structure
+## Scale Blocks
 
-| Block | Intended Role |
+| Production Block | Intended Role |
 |---|---|
-| Lower town | Current market, guild, inn, crafts, and ordinary housing |
-| Noble and castle approach | Walled estates, guard posts, administration, castle plaza |
-| Academy quarter | Magic academy campus, dormitory area, practice fields |
-| Cathedral quarter | Cathedral, gardens, charity houses, archives, church plaza |
+| Central plaza and mixed streets | Current plaza hub, homes, small shops, inns, markets, routes, and civic signs |
+| Nearby facilities | Guild, inn, merchant office, backstreet, guard-facing services, and ordinary housing |
+| Large institutional approaches | Academy campus and cathedral grounds with nearby residents, shops, records, and side streets |
+| Royal/civic expansion | Castle approach, administration, guard plazas, estates, and the ordinary town around them |
+
+Administration, academy, church, and trade facilities can cluster where it makes
+sense, but the city should not become four separated theme districts. Homes,
+shops, alleys, inns, record offices, and street traffic should remain mixed.
 
 ## Royal Castle
 
@@ -45,7 +50,9 @@ Future elements:
 
 ## Church And Cathedral
 
-The church quarter should eventually become a cathedral and garden district.
+The church surroundings should eventually become a cathedral-scale approach with
+gardens, record offices, treatment spaces, and nearby homes/shops, not an
+isolated church-only quarter.
 
 Future direction:
 

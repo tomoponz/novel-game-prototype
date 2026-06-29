@@ -234,4 +234,8 @@ Branch `feature/resolve-open-gameplay-issues-20260629` advances open issues
   supplied (see `docs/assets/model-credits.md`).
 - #15 `academyCampus` and #16 `churchGrounds`: new lightweight outdoor maps that
   link the plaza to the existing academy/church interiors.
-- #17 Four-block plan: directional signage + staged plan doc only (no rebuild).
+- #17 Capital scale expansion: the four-block plan is defined as a staged
+  production unit for expanding central Aurelia to roughly 4x scale, not as four
+  themed/factional districts. Phase 1 adds central-plaza street cues, guide
+  signs, small shops/homes/props, and flavor NPCs; see
+  `docs/world/capital-scale-expansion-plan.md`.

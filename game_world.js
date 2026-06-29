@@ -736,7 +736,39 @@ function academyDistrict(x, z) { house(x, z, 40, 28, 20, 0x8a8fb0, "ACADEMY", tr
 const SHOP_T = { weapon: { name: "武器屋", wall: 0x6a5a4a, accent: 0x8a9098, keeper: "blacksmith", kname: "武器屋の主", dlg: "shop_weapon" }, armor: { name: "防具屋", wall: 0x5a6068, accent: 0xb6bcc6, keeper: "merchant", kname: "防具屋の主", dlg: "shop_armor" }, potion: { name: "薬屋", wall: 0x4a6a5a, accent: 0x6fcf8f, keeper: "merchant", kname: "薬師", dlg: "shop_potion" }, magicshop: { name: "魔法具店", wall: 0x4a4a6a, accent: 0x8fbfff, keeper: "teacher", kname: "魔法具商", dlg: "shop_magic" }, bakery: { name: "パン屋", wall: 0x8a6a44, accent: 0xe0b870, keeper: "merchant", kname: "パン屋", dlg: "shop_bakery" }, inn: { name: "宿屋 曲がった匙亭", wall: 0x7a5a3a, accent: 0xd8b36b, keeper: "merchant", kname: "女将マルタ", dlg: "inn_gate", enter: 1 }, tavern: { name: "酒場", wall: 0x6a4438, accent: 0xc8763a, keeper: "merchant", kname: "酒場の主", dlg: "shop_tavern" }, records: { name: "記録所", wall: 0x6a6458, accent: 0xd8c89a, keeper: "noble", kname: "記録官", dlg: "shop_records" } };
 function shopfront(x, z, angle, type) { const T = SHOP_T[type]; house(x, z, 16, 13, rand(8, 11), T.wall, T.name, true, angle); const fx = Math.sin(angle), fz = Math.cos(angle); const aw = box(x + fx * 6.6, 2.6, z + fz * 6.6, 4.4, .16, 1.6, T.accent, "", world); aw.rotation.y = angle; addNpc(T.keeper, x + fx * 7.4, z + fz * 7.4, T.wall, T.kname, T.dlg); shopAnchors.push([x, z, 13]); if (T.enter) locations.push({ id: T.dlg, name: T.name + "に入る", x: x + fx * 6.8, z: z + fz * 6.8, r: 5, dialogue: T.dlg }); }
 function shoppingStreet() { for (const [t, x] of [["weapon", 70], ["armor", 110], ["potion", 150], ["magicshop", 190]]) shopfront(x, -22, faceToward(0, 1), t); for (const [t, x] of [["inn", 70], ["tavern", 110], ["records", 150], ["bakery", 190]]) shopfront(x, 22, faceToward(0, -1), t); for (let i = 0; i < 6; i++) { lamp(52 + i * 28, -11); lamp(52 + i * 28, 11); } for (let i = 0; i < 5; i++) addNpc(pick(["merchant", "traveler", "adventurer"]), rand(55, 200), rand(-10, 10), pick([0x8c6f4f, 0x7f9fbd, 0x6f8aa6]), "通行人", "townsfolk"); }
-function buildInn() { setEnv(0x241a16, 12, 38); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x4a3a2a, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.85)); const t = new THREE.PointLight(0xffb86a, 8, 22, 2); t.position.set(0, 3.4, -1); world.add(t); room(14, 14, 3.6, 0x3a2a22); box(0, .6, -4.6, 5.4, 1.2, 1.1, 0x6a4a2c, "counter", world, true); for (let i = 0; i < 3; i++) box(-4.5 + i * 4.5, .4, 3.8, 2.4, .7, 1.4, 0x5a4632, "table", world, true); for (const [bx, bz] of [[-2, -2.6], [2, -2.6]]) box(bx, .35, bz, 2, .6, 1.6, 0x4a3320, "bench", world, true); placeModelNpc("innMarta", "merchant", 0, -3.4, 0xd8b36b, "女将マルタ", "inn_marta", { map: "inn" }); addNpc("adventurer", -3.6, 2, pick([0x8c6f4f, 0x58718d]), "酒場の客", "townsfolk"); addNpc("slum", 3.6, 2.4, 0x6a5a4a, "酔っ払い", "townsfolk"); locations.push({ id: "inn_marta", name: "女将マルタと話す", x: 0, z: -3.4, r: 3, dialogue: "inn_marta" }, { id: "inn_exit", name: "外へ出る", x: 0, z: 6.4, r: 2.4, targetMap: "plaza", spawn: { x: 70, z: 30 } }); }
+// #48 宿屋・酒場「曲がった匙亭」: 受付/食堂酒場/客席/客室入口/噂掲示板/2階風階段 を持つ滞在・情報拠点。
+function buildInn() {
+  setEnv(0x241a16, 12, 40); bounds = { minX: -11, maxX: 11, minZ: -9, maxZ: 9 };
+  ground(24, 20, 0x4a3a2a, "plank");
+  world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.9));
+  for (const [lx, lz] of [[0, -1], [-7, 3], [7, 3]]) { const t = new THREE.PointLight(0xffb86a, 6, 18, 2); t.position.set(lx, 3.4, lz); world.add(t); }
+  room(24, 20, 3.5, 0x3a2a22);
+  // 受付カウンター(女将)
+  box(0, .6, -4.8, 5.4, 1.2, 1.1, 0x6a4a2c, "counter", world, true);
+  box(0, 1.3, -6.4, 5.6, 2.4, .4, 0x5a3d27, "shelf", world, true); addSign(0, -6.2, "受付 / 曲がった匙亭");
+  // 食堂・酒場スペース(卓と客席)
+  for (let i = 0; i < 4; i++) box(-6 + i * 4, .5, 2.6, 1.8, 1, 1.8, 0x5a4632, "table", world, true);
+  for (const [bx, bz] of [[-6, .6], [-6, 4.6], [-2, .6], [-2, 4.6], [2, .6], [2, 4.6], [6, .6], [6, 4.6]]) bench(bx, bz, 0);
+  // 樽・酒棚(酒場)
+  barrel(-9, -2); barrel(-9, 0); box(-9.6, 1.2, -4, .6, 2.4, 2, 0x4a3320, "barShelf", world, true);
+  // 噂掲示板
+  box(8.6, 1.3, -3, .3, 2, 2.4, 0x4a301c, "rumorBoard", world, true); addSign(8.6, -5, "噂掲示板");
+  // 客室入口＋2階風階段
+  for (let i = 0; i < 5; i++) box(9.4, .3 + i * .42, 6 - i * .8, 2, .42, .8, 0x5a4632, "stair", world, true); addSign(9.4, 8.2, "客室(2階)");
+  box(-9.6, 1.4, 6.6, 1, 2.8, 2.4, 0x4a3320, "roomDoor", world, true); addSign(-9.6, 4.4, "客室入口");
+  // NPC: 女将(固定) + 噂NPC
+  placeModelNpc("innMarta", "merchant", 0, -3.4, 0xd8b36b, "女将マルタ", "inn_marta", { map: "inn" });
+  addNpc("merchant", -6, 1.9, 0x9a6f54, "旅商人", "inn_traveler");
+  addNpc("adventurer", -2, 3.7, 0x8c6f4f, "宿の冒険者", "inn_adventurer");
+  addNpc("student", 2, 1.9, 0x2e3a5c, "学院生", "inn_student");
+  addNpc("faithful", 6, 3.7, 0xc9c4ad, "教会関係者", "inn_cleric");
+  addNpc("guard", 6, 1.5, 0xb77954, "非番の兵士", "inn_soldier");
+  locations.push(
+    { id: "inn_marta", name: "女将マルタと話す", x: 0, z: -3.4, r: 3, dialogue: "inn_marta" },
+    { id: "inn_board", name: "噂掲示板を読む", x: 8.6, z: -3, r: 2.6, dialogue: "inn_board" },
+    { id: "inn_exit", name: "外へ出る", x: 0, z: 8.4, r: 2, targetMap: "plaza", spawn: { x: 70, z: 30 } }
+  );
+}
 
 function cityWall() { for (const [x, z, w, d] of [[0, -675, 1320, 10], [0, 675, 1320, 10], [-675, 0, 10, 1320], [675, 0, 10, 1320]]) box(x, 5, z, w, 10, d, 0x6d6c64, "wall", world, true); for (let i = -620; i <= 620; i += 75) { box(i, 10, -675, 10, 18, 10, 0x74736b, "tower", world, true); box(i, 10, 675, 10, 18, 10, 0x74736b, "tower", world, true); box(-675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); box(675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); } }
 function addGate(x, z) { box(x, 4, z, 38, 8, 7, 0x6d6c64, "gate", world, true); box(x - 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); box(x + 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); }

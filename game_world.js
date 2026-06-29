@@ -764,20 +764,25 @@ function updateMovers(dt) {
     const vx = dx / dist, vz = dz / dist, step = m.speed * dt, r = (m.r || .7) * .74;
     const nx = m.obj.position.x + vx * step, nz = m.obj.position.z + vz * step;
     if (!state.debug && blockedStatic(nx, nz, r)) {
+      m.stuck = (m.stuck || 0) + 1;
       const side = m.avoidTurn || (Math.random() < .5 ? -1 : 1);
       m.avoidTurn = side;
       const sx = -vz * side, sz = vx * side, ax = m.obj.position.x + sx * step * .65, az = m.obj.position.z + sz * step * .65;
-      if (!blockedStatic(ax, az, r)) {
+      // 横回避が通れば滑らせる。ただし長く詰まり続けたら(grind防止)経路を進めて再ルート。
+      if (m.stuck < 14 && !blockedStatic(ax, az, r)) {
         m.obj.position.x = ax;
         m.obj.position.z = az;
         m.obj.rotation.y = Math.atan2(sx, sz);
       } else {
         m.index = (m.index + 1) % m.path.length;
         m.wait = m.type === "cart" ? rand(.35, .9) : rand(.2, .8);
+        m.avoidTurn = 0;
+        m.stuck = 0;
       }
       continue;
     }
     m.avoidTurn = 0;
+    m.stuck = 0;
     m.obj.position.x = nx;
     m.obj.position.z = nz;
     m.obj.rotation.y = Math.atan2(vx, vz);
@@ -951,7 +956,7 @@ function closeMenu() { if (!state.menuOpen) return; state.menuOpen = false; ui.m
 function toggleMenu() { state.menuOpen ? closeMenu() : openMenu(); }
 function bindMenu() { ui.menuClose?.addEventListener("click", closeMenu); ui.menu?.addEventListener("click", (e) => { if (e.target === ui.menu) closeMenu(); }); }
 function bindAudioToggle() { if (!ui.audioToggle) return; ui.audioToggle.addEventListener("change", () => { audio.enable(); audio.setMuted(!ui.audioToggle.checked); }); }
-window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, items: () => syncPermits(), resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
+window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, items: () => syncPermits(), movers: () => ({ total: movers.length, byType: movers.reduce((a, m) => (a[m.type] = (a[m.type] || 0) + 1, a), {}), stuck: movers.filter((m) => (m.stuck || 0) > 6).length, sample: movers.slice(0, 8).map((m) => ({ type: m.type, x: +m.obj.position.x.toFixed(1), z: +m.obj.position.z.toFixed(1), idx: m.index, stuck: m.stuck || 0, wait: +(m.wait || 0).toFixed(2), visible: m.obj.visible !== false })) }), resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
 peek: () => ({ cam: camera.position.toArray().map((n) => +n.toFixed(1)), dir: (() => { const d = new THREE.Vector3(); camera.getWorldDirection(d); return d.toArray().map((n) => +n.toFixed(2)); })(), balls: projectiles.map((p) => { const ndc = p.ball.position.clone().project(camera); return { pos: p.ball.position.toArray().map((n) => +n.toFixed(1)), visible: p.ball.visible, inScene: !!p.ball.parent, emis: p.ball.material.emissiveIntensity, ndc: [+ndc.x.toFixed(2), +ndc.y.toFixed(2), +ndc.z.toFixed(2)] }; }) }) };
 // 公式ミニマップAPI(読み取り専用): next_destination.js はこれを優先利用し、cameraからの近似(approx)位置を使わない。
 window.__AURELIA_MINIMAP__ = () => ({

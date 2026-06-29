@@ -1,0 +1,129 @@
+.permit-ledger-panel {
+  position: fixed;
+  z-index: 22;
+  left: 50%;
+  top: 50%;
+  width: min(620px, calc(100vw - 34px));
+  max-height: min(76vh, 720px);
+  overflow: auto;
+  padding: 16px 16px 14px;
+  border: 1px solid rgba(255, 208, 107, .46);
+  border-radius: 18px;
+  background: rgba(11, 10, 8, .88);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, .56), inset 0 0 34px rgba(255, 208, 107, .07);
+  color: var(--paper);
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -48%) scale(.98);
+  pointer-events: none;
+  backdrop-filter: blur(14px);
+  transition: opacity .18s ease, visibility .18s ease, transform .18s ease;
+}
+
+.permit-ledger-panel.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+}
+
+.permit-ledger-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.permit-ledger-kicker {
+  margin: 0 0 6px;
+  color: #ffd06b;
+  font: 800 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .14em;
+}
+
+.permit-ledger-title {
+  margin: 0;
+  color: #fff1ce;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.permit-ledger-close {
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 10px;
+  background: rgba(255,255,255,.07);
+  color: var(--paper);
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.permit-ledger-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.permit-ledger-item {
+  padding: 9px 10px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 11px;
+  background: rgba(255,255,255,.05);
+}
+
+.permit-ledger-label {
+  display: block;
+  color: rgba(246, 239, 225, .56);
+  font: 700 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .08em;
+  margin-bottom: 5px;
+}
+
+.permit-ledger-value {
+  display: block;
+  color: #8fbfff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.permit-ledger-item.is-active .permit-ledger-value {
+  color: #ffd06b;
+}
+
+.permit-ledger-item.is-risk .permit-ledger-value {
+  color: #ff8b75;
+}
+
+.permit-ledger-note {
+  margin: 12px 0 0;
+  color: rgba(246, 239, 225, .74);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.permit-ledger-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 21;
+  background: rgba(0,0,0,.36);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .18s ease, visibility .18s ease;
+}
+
+.permit-ledger-backdrop.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+@media (max-width: 760px) {
+  .permit-ledger-grid {
+    grid-template-columns: 1fr;
+  }
+  .permit-ledger-title {
+    font-size: 16px;
+  }
+}

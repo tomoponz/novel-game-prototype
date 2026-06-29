@@ -4,6 +4,8 @@
 正典の世界設定は `docs/world/kingdom-overworld-plan.md`（魔導王国＝世界、王都＝中央ハブ、
 4ブロックは王都中心部のみ、魔法学院は王国内の一施設）。
 
+#49/#50/#51 の完了判定と残る発展案は `docs/world/facility-expansion-issue-resolution.md` に整理する。
+
 ## 0. 拡張方針
 
 - 王都内の施設が「イベント用の小部屋」に見えると、制度機関としての説得力が弱い。

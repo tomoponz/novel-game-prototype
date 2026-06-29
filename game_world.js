@@ -153,7 +153,25 @@ const DIALOGUES = {
   shop_bakery: { speaker: "パン屋", lines: ["黒パンは銅貨一枚。今日の分は焼けてるよ。", "腹が減ってちゃ、信用も身分も積めない。まず食いな。"] },
   shop_tavern: { speaker: "酒場の主", lines: ["席はあるが、揉め事はよそでやれ。ここは情報が酒より速く回る。", "“身元不明が三日で消える”——そんな噂、あんたも気をつけな。"] },
   shop_records: { speaker: "記録官", lines: ["出生記録、移住記録、洗礼記録。記録のない者は、この街では“いない人”に近い。", "紹介状があるなら仮の確認書は作れる。正式な身分には、保証人の署名が要る。"] },
-  townsfolk: { speaker: "通行人", lines: ["昼の市場は賑やかだよ。夜は——鐘三つを過ぎたら出歩くな。人が獣より怖くなる。", "迷ったら大通りへ戻りな。看板と鐘楼を目印にすればいい。"] }
+  townsfolk: { speaker: "通行人", lines: ["昼の市場は賑やかだよ。夜は——鐘三つを過ぎたら出歩くな。人が獣より怖くなる。", "迷ったら大通りへ戻りな。看板と鐘楼を目印にすればいい。"] },
+  // === 王都内施設の拡張(#47 ギルド / #50 北門詰所 / #48 宿屋 / #51 住宅・路地) ===
+  guild_board: { speaker: "依頼掲示板", lines: ["討伐・採集・護衛・運搬——王都とその周辺の依頼が等級ごとに貼り出されている。", "『F級は単独受注不可』『無登録者の受注を禁ず』と赤枠の但し書き。", "ここでも、力より先に登録と等級が物を言う。"] },
+  guild_clerk: { speaker: "ギルド職員", lines: ["登録は受付、測定は右の測定室、面談は奥のギルドマスター室です。", "順番と記録を守ってください。割り込みは査定に響きます。"] },
+  guild_lobby: { speaker: "待機中の冒険者", lines: ["朝から待たされてる。依頼も等級で振り分けだ。", "新顔か。無登録なら、まず受付だ。妙な噂を立てられる前にな。"] },
+  gate_record: { speaker: "記録係", lines: ["通行者は全員ここで記帳する。名、出身、契約、用件。", "紹介状の番号も控える。お前が逃げても、この紙が追う。"] },
+  gate_notice: { speaker: "詰所の掲示", lines: ["『一時通行は身元保証ではない』『問題行動は登録抹消』『夜間通行は別許可』。", "検問は、王都が誰を入れたかを記録する制度だ。通すかどうかは紙が決める。"] },
+  inn_board: { speaker: "噂掲示板", lines: ["走り書きの噂が画鋲で重ねて留められている。", "『学院の禁書区が封鎖された』『教会の地下記録室に空きが出た』", "『市場区は商会信用がないと卸さない』『王城区から呼び出しの噂』『王都外の遺跡に調査隊』。"] },
+  inn_traveler: { speaker: "旅商人", lines: ["王都外の遺跡に調査隊が入ったらしい。許可がないと近づけない場所だ。", "商会信用があれば南港の話も回ってくる。なければ、ただの噂止まりさ。"] },
+  inn_adventurer: { speaker: "宿の冒険者", lines: ["F級のうちは王都の中の依頼で食いつなぐしかない。", "外門の練習場で査定を上げな。記録が積めば、回ってくる依頼も変わる。"] },
+  inn_student: { speaker: "学院生", lines: ["禁書区が封鎖されたって聞いた？　召喚系の資料が動いたとか。", "……無属性で水晶にヒビ、の噂の人？　学院が気にしてるよ。気をつけて。"] },
+  inn_cleric: { speaker: "教会関係者", lines: ["地下記録室は、出生も移住も洗礼も、原本が眠る場所。", "身元のない人ほど、あそこに呼ばれる。記録されることは、守られることでもあり、縛られることでもある。"] },
+  inn_soldier: { speaker: "兵士", lines: ["王城区から呼び出しがかかる者がいるらしい。記録が集まりすぎた者だ。", "便利になったぶん、断れなくなる。……お前も気をつけろよ。"] },
+  backstreet: { speaker: "ユウジ", lines: ["大通りの裏。洗濯物が渡され、井戸の周りに水音と話し声。", "施設の街ではなく、人が暮らす街の顔がここにある。", "行き止まりと裏口が入り組み、身元のない者が息をひそめる場所でもある。"] },
+  alley_warn: { speaker: "路地の住人", lines: ["見ない顔だね。ここじゃ身元のない奴は、まず疑われる。", "悪いことは言わない。ギルドでも教会でも、早く“紙”を作りな。"] },
+  alley_guild: { speaker: "井戸端の女", lines: ["ギルドに登録した子は、少し人扱いが変わるよ。", "登録者は守られる。代わりに、逃げ場も記録される。どっちがいいかは、あんた次第さ。"] },
+  alley_church: { speaker: "古株の住人", lines: ["教会の記録係は、よく見てる。誰が来て、誰が消えたか。", "記録に残れば、いない人にはならない。……残らなければ、三日で忘れられる。"] },
+  alley_market: { speaker: "路地の小商人", lines: ["市場区はね、金より商会信用だよ。信用がなけりゃ、まともな品は卸してもらえない。", "信用は帳簿で回る。あんたの名前、まだどこにも載ってないだろ？"] },
+  alley_watch: { speaker: "声をひそめる男", lines: ["王城区から、街を見てる目があるって話だ。記録の集まりすぎた奴を呼び出すとか。", "便利と監視は同じ紐の両端だ。引けば、向こうも引く。"] }
 };
 
 const scene = new THREE.Scene();
@@ -256,7 +274,7 @@ function bindQualitySelect() {
 }
 function bindStartEarly() { const start = () => { if (state.started) return; audio.enable(); audio.play("ui_decide"); state.started = true; ui.title?.classList.add("is-hidden"); ui.loading?.classList.remove("is-hidden"); setTimeout(() => { const map = params.get("map") || data.startMap || "forestRoad"; loadMap(map, initialSpawn(map)); state.loaded = true; ui.loading?.classList.add("is-hidden"); }, 30); }; ui.start?.addEventListener("click", start); ui.start?.addEventListener("pointerup", (e) => { e.preventDefault(); start(); }); }
 function initLights() { hemiLight = new THREE.HemisphereLight(0xf0e6cf, 0x415063, 1.95); scene.add(hemiLight); sunLight = new THREE.DirectionalLight(0xfff1d6, 2.55); sunLight.position.set(90, 135, 70); sunLight.castShadow = quality.shadow; sunLight.shadow.mapSize.set(1536, 1536); sunLight.shadow.bias = -0.0004; Object.assign(sunLight.shadow.camera, { near: .5, far: 620, left: -390, right: 390, top: 390, bottom: -390 }); scene.add(sunLight); ambLight = new THREE.AmbientLight(0x556070, .5); scene.add(ambLight); }
-function isOutdoorMap() { return state.map === "plaza" || state.map === "forestRoad" || state.map === "trainingGround" || state.map === "academyCampus" || state.map === "churchGrounds"; }
+function isOutdoorMap() { return state.map === "plaza" || state.map === "forestRoad" || state.map === "trainingGround" || state.map === "academyCampus" || state.map === "churchGrounds" || state.map === "backstreet"; }
 function phaseSnapshot(phase) {
   const p = DAYPHASES[phase] || DAYPHASES.day;
   return { sky: new THREE.Color(p.sky), fogNear: p.fog[0], fogFar: p.fog[1], sun: p.sun, sunCol: new THREE.Color(p.sunCol), hemi: p.hemi, amb: p.amb, ambCol: new THREE.Color(p.ambCol) };
@@ -311,7 +329,7 @@ function updateTimeTransition(dt) {
   if (k >= 1) timeTransition = null;
 }
 function setTimeOfDay(phase, instant = false) { if (instant) { state.timeOfDay = phase; applyTimeOfDay(); updateHud(); } else transitionTimeOfDay(phase); }
-function initialSpawn(map) { return ({ forestRoad: { x: 0, z: 74 }, plaza: { x: 0, z: 610 }, guildHall: { x: 0, z: 6.2 }, church: { x: 0, z: 5.5 }, churchGrounds: { x: 0, z: 48 }, trainingGround: { x: 0, z: 48 }, academy: { x: 0, z: 9 }, academyCampus: { x: 0, z: 50 }, inn: { x: 0, z: 5.4 } })[map] || { x: 0, z: 74 }; }
+function initialSpawn(map) { return ({ forestRoad: { x: 0, z: 74 }, plaza: { x: 0, z: 610 }, guildHall: { x: 0, z: 6.2 }, church: { x: 0, z: 5.5 }, churchGrounds: { x: 0, z: 48 }, trainingGround: { x: 0, z: 48 }, academy: { x: 0, z: 9 }, academyCampus: { x: 0, z: 50 }, inn: { x: 0, z: 5.4 }, backstreet: { x: 0, z: 18 } })[map] || { x: 0, z: 74 }; }
 function mat(color, rough = .82, em = 0x000000, pow = 0) { const k = `${color}:${rough}:${em}:${pow}`; if (!mats.has(k)) mats.set(k, new THREE.MeshStandardMaterial({ color, roughness: rough, emissive: em, emissiveIntensity: pow, flatShading: true })); return mats.get(k); }
 function add(geo, material, parent = world, cast = false, receive = true) { const m = new THREE.Mesh(geo, material); m.castShadow = Boolean(cast && quality.shadow); m.receiveShadow = receive; parent.add(m); return m; }
 function rand(a, b) { return a + Math.random() * (b - a); }
@@ -439,7 +457,7 @@ function loadMap(id, spawn) {
   plainSpecs = [];
   shopAnchors = [];
   resetModelNpcBudget(id);
-  ({ forestRoad: buildForestRoad, plaza: buildCity, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround, academy: buildAcademy, academyCampus: buildAcademyCampus, churchGrounds: buildChurchGrounds, inn: buildInn }[id] || buildForestRoad)();
+  ({ forestRoad: buildForestRoad, plaza: buildCity, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround, academy: buildAcademy, academyCampus: buildAcademyCampus, churchGrounds: buildChurchGrounds, inn: buildInn, backstreet: buildBackstreet }[id] || buildForestRoad)();
   locations.forEach(addMarker);
   applyTimeOfDay();
   player.position.set(spawn.x, spawn.y || 0, spawn.z);
@@ -623,9 +641,50 @@ function placeModelNpc(modelKey, fallbackVariant, x, z, color, name, dialogue, o
   }).catch(() => setModelStatus(n, modelKey, "fallback", "load-error"));
   return n;
 }
-function buildForestRoad() { setEnv(0x6f91a1, 40, quality.fog); bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 }; ground(210, 290, 0x35513d); road(0, 0, 9, 260, 0x746756, "dirt"); for (let z = -120; z <= 120; z += 18) { road(-15, z, 20, 3, 0x665b4f, "dirt"); road(16, z + 8, 18, 2.8, 0x665b4f, "dirt"); } for (let i = 0; i < Math.floor(180 * quality.houses); i++) addTree((Math.random() < .5 ? -1 : 1) * rand(12, 86), rand(-128, 128), rand(.8, 1.4), true); for (let i = 0; i < Math.floor(60 * quality.props); i++) addRock(rand(-85, 85), rand(-125, 125), rand(.3, .8)); addGate(0, -112); addCaravan(6, 15); addSign(7, -90, "ROYAL CAPITAL"); locations.push({ id: "gate", name: "北門の検問を受ける", x: 0, z: -108, r: 6, dialogue: "north_gate" }, { id: "caravan", name: done("merchant") ? "救助済みの荷車を見る" : "荷車襲撃現場を見る", x: 6, z: 15, r: 6, dialogue: "caravan_attack" }); placeModelNpc("guard", "guard", 4, -98, 0xb77954, "北門衛兵", "north_gate", { map: "forestRoad" }); for (let i = 0; i < 4; i++) addNpc("guard", rand(-8, 8), rand(-70, 45), 0xb77954, "北門衛兵", "north_gate"); }
-function buildCity() { setEnv(0xbcd6e6, 130, 1500); bounds = { minX: -680, maxX: 680, minZ: -680, maxZ: 680 }; ground(1420, 1420, 0x6f8a52, "grass"); const floor = add(new THREE.PlaneGeometry(1330, 1330), surfaceMat("dirt", 90, 90), world, false, true); floor.rotation.x = -Math.PI / 2; floor.position.y = .012; cityWall(); road(0, 0, 24, 1240, 0x817767); road(0, 0, 1240, 24, 0x817767); for (const z of [-330, -130, 130, 330, 430]) road(0, z, 980, 9, 0x6f6657); for (const x of [-430, -330, -130, 130, 330, 430]) road(x, 0, 9, 980, 0x6f6657); minorAlleys(); castleHill(); centralPlaza(); guildDistrict(135, -70); churchDistrict(-185, -85); academyDistrict(-300, -60); marketDistrict(285, 85); craftDistrict(350, -125); nobleDistrict(-250, -350); slumDistrict(-410, 245); trainingDistrict(380, 330); gateDistrict(0, 610); shoppingStreet(); cityFill(); buildHouseBatch(facadeSpecs, true); buildHouseBatch(plainSpecs, false); traffic(); pedestrians(); props(); streetDressing(); addSign(0, 610, "NORTH GATE"); addSign(135, -38, "GUILD"); addSign(-185, -48, "CHURCH"); addSign(-300, -42, "ACADEMY"); addSign(285, 125, "MARKET"); addSign(-390, 235, "ALLEY"); addSign(15, 72, "北 ─ 北門・森の街道"); addSign(15, -72, "南 ─ 王城・貴族区(丘)"); addSign(72, 15, "東 ─ 市場・職人区"); addSign(-72, 15, "西 ─ 学院・教会区"); locations.push({ id: "plaza", name: "中央広場を見渡す", x: 0, z: 40, r: 12, dialogue: "plaza" }, { id: "guild", name: "冒険者ギルドに入る", x: 135, z: -60, r: 10, dialogue: "guild" }, { id: "market", name: "市場の盗難騒ぎを見る", x: 260, z: 95, r: 13, dialogue: "market" }, { id: "church", name: "大聖堂の敷地に入る", x: -185, z: -70, r: 12, targetMap: "churchGrounds", spawn: { x: 0, z: 44 } }, { id: "training", name: "外門練習場へ行く", x: 360, z: 330, r: 13, dialogue: "training_gate" }, { id: "alley", name: "怪しい路地裏に入る", x: -390, z: 235, r: 12, dialogue: "alley" }, { id: "blacksmith", name: "鍛冶屋に近づく", x: 330, z: -110, r: 9, dialogue: "blacksmith" }); }
-function buildGuildHall() { setEnv(0x1f1711, 12, 36); bounds = { minX: -8, maxX: 8, minZ: -7, maxZ: 7 }; ground(16, 15, 0x4c3727, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.9)); const torch = new THREE.PointLight(0xffb86a, 8, 22, 2); torch.position.set(0, 3.6, -2); world.add(torch); room(16, 15, 3.2, 0x3a281c); box(0, .55, -4.5, 6.4, 1.1, .9, 0x6b4a2f, "counter", world, true); box(0, 1.2, -6.2, 5.6, 2.4, .5, 0x5a3d27, "shelf", world, true); addQuestBoard(-5.6, -4.4); const crystal = add(new THREE.SphereGeometry(.45, 16, 10), mat(0x80d8ff, .2, 0x65cfff, .9), world, false, false); crystal.position.set(3.6, 1.15, -3.4); cull(crystal, 3.6, -3.4, 60); cyl(3.6, .55, -3.4, .32, .8, 0x62513a, "crystalBase", world, true); placeModelNpc("guildReceptionist", "receptionist", 0, -3.3, 0xd8b36b, "受付", "guild_reception", { map: "guildHall" }); placeModelNpc("guildmaster", "noble", -3.8, -3.4, 0x4f5d6f, "ギルドマスター", "guildmaster", { map: "guildHall" }); addNpc("adventurer", -3.8, .9, 0x8c6f4f, "冒険者", "generic"); locations.push({ id: "reception", name: "受付で登録申請をする", x: 0, z: -3.3, r: 3, dialogue: "guild_reception" }, { id: "crystal", name: "魔力測定水晶に触れる", x: 3.6, z: -3.4, r: 2.6, dialogue: "mana_measure" }, { id: "guildmaster", name: "ギルドマスターと話す", x: -3.8, z: -3.4, r: 2.8, dialogue: "guildmaster" }, { id: "guild_exit", name: "王都へ戻る", x: 0, z: 6.7, r: 2.4, targetMap: "plaza", spawn: { x: 135, z: -42 } }); }
+function buildForestRoad() { setEnv(0x6f91a1, 40, quality.fog); bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 }; ground(210, 290, 0x35513d); road(0, 0, 9, 260, 0x746756, "dirt"); for (let z = -120; z <= 120; z += 18) { road(-15, z, 20, 3, 0x665b4f, "dirt"); road(16, z + 8, 18, 2.8, 0x665b4f, "dirt"); } for (let i = 0; i < Math.floor(180 * quality.houses); i++) addTree((Math.random() < .5 ? -1 : 1) * rand(12, 86), rand(-128, 128), rand(.8, 1.4), true); for (let i = 0; i < Math.floor(60 * quality.props); i++) addRock(rand(-85, 85), rand(-125, 125), rand(.3, .8)); addGate(0, -112); gateCheckpoint(0, -112); addCaravan(6, 15); addSign(7, -90, "ROYAL CAPITAL"); locations.push({ id: "gate", name: "北門の検問を受ける", x: 0, z: -108, r: 6, dialogue: "north_gate" }, { id: "caravan", name: done("merchant") ? "救助済みの荷車を見る" : "荷車襲撃現場を見る", x: 6, z: 15, r: 6, dialogue: "caravan_attack" }); placeModelNpc("guard", "guard", 4, -98, 0xb77954, "北門衛兵", "north_gate", { map: "forestRoad" }); for (let i = 0; i < 4; i++) addNpc("guard", rand(-8, 8), rand(-70, 45), 0xb77954, "北門衛兵", "north_gate"); }
+function buildCity() { setEnv(0xbcd6e6, 130, 1500); bounds = { minX: -680, maxX: 680, minZ: -680, maxZ: 680 }; ground(1420, 1420, 0x6f8a52, "grass"); const floor = add(new THREE.PlaneGeometry(1330, 1330), surfaceMat("dirt", 90, 90), world, false, true); floor.rotation.x = -Math.PI / 2; floor.position.y = .012; cityWall(); road(0, 0, 24, 1240, 0x817767); road(0, 0, 1240, 24, 0x817767); for (const z of [-330, -130, 130, 330, 430]) road(0, z, 980, 9, 0x6f6657); for (const x of [-430, -330, -130, 130, 330, 430]) road(x, 0, 9, 980, 0x6f6657); minorAlleys(); castleHill(); centralPlaza(); guildDistrict(135, -70); churchDistrict(-185, -85); academyDistrict(-300, -60); marketDistrict(285, 85); craftDistrict(350, -125); nobleDistrict(-250, -350); slumDistrict(-410, 245); trainingDistrict(380, 330); gateDistrict(0, 610); shoppingStreet(); cityFill(); buildHouseBatch(facadeSpecs, true); buildHouseBatch(plainSpecs, false); traffic(); pedestrians(); props(); streetDressing(); addSign(0, 610, "NORTH GATE"); addSign(135, -38, "GUILD"); addSign(-185, -48, "CHURCH"); addSign(-300, -42, "ACADEMY"); addSign(285, 125, "MARKET"); addSign(-390, 235, "ALLEY"); addSign(15, 72, "北 ─ 北門・森の街道"); addSign(15, -72, "南 ─ 王城・貴族区(丘)"); addSign(72, 15, "東 ─ 市場・職人区"); addSign(-72, 15, "西 ─ 学院・教会区"); locations.push({ id: "plaza", name: "中央広場を見渡す", x: 0, z: 40, r: 12, dialogue: "plaza" }, { id: "guild", name: "冒険者ギルドに入る", x: 135, z: -60, r: 10, dialogue: "guild" }, { id: "market", name: "市場の盗難騒ぎを見る", x: 260, z: 95, r: 13, dialogue: "market" }, { id: "church", name: "大聖堂の敷地に入る", x: -185, z: -70, r: 12, targetMap: "churchGrounds", spawn: { x: 0, z: 44 } }, { id: "training", name: "外門練習場へ行く", x: 360, z: 330, r: 13, dialogue: "training_gate" }, { id: "alley", name: "裏路地に入る", x: -390, z: 235, r: 12, targetMap: "backstreet", spawn: { x: 0, z: 18 } }, { id: "blacksmith", name: "鍛冶屋に近づく", x: 330, z: -110, r: 9, dialogue: "blacksmith" }); }
+// #47 ギルド会館: 受付/依頼掲示板/待合/魔力測定室/ギルドマスター室前/訓練場案内 を持つ中規模施設。
+// 進行(guild_reception/mana_measure/guildmaster の座標・dialogue)は不変。guild_anomaly.js と整合。
+function buildGuildHall() {
+  setEnv(0x1f1711, 12, 42); bounds = { minX: -13, maxX: 13, minZ: -10, maxZ: 9 };
+  ground(28, 22, 0x4c3727, "plank");
+  world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.95));
+  for (const [lx, lz] of [[0, -4], [-8, 2], [8, 2]]) { const torch = new THREE.PointLight(0xffb86a, 6, 20, 2); torch.position.set(lx, 3.7, lz); world.add(torch); }
+  room(28, 22, 3.5, 0x3a281c);
+  // 受付カウンター(既存導線)
+  box(0, .55, -4.5, 7.2, 1.1, .9, 0x6b4a2f, "counter", world, true);
+  box(0, 1.35, -6.6, 7.8, 2.7, .5, 0x5a3d27, "shelf", world, true);
+  addSign(0, -6.2, "受付 / RECEPTION");
+  // 依頼掲示板コーナー(左)
+  addQuestBoard(-10, -4.2); addQuestBoard(-10, -1.4); addSign(-10, -6.4, "依頼掲示板");
+  // 魔力測定室(右・低い間仕切りで区切る。水晶は既存座標)
+  for (const pz of [-6.5, -1]) box(7.6, .95, pz, .3, 1.9, 3.2, 0x4a3526, "partition", world, true);
+  box(6, .95, -7.6, 3.6, 1.9, .3, 0x4a3526, "partition", world, true);
+  const crystal = add(new THREE.SphereGeometry(.45, 16, 10), mat(0x80d8ff, .2, 0x65cfff, .9), world, false, false); crystal.position.set(3.6, 1.15, -3.4); cull(crystal, 3.6, -3.4, 60);
+  cyl(3.6, .55, -3.4, .32, .8, 0x62513a, "crystalBase", world, true);
+  addSign(5.6, -7.2, "魔力測定室");
+  // ギルドマスター室前(左奥・扉と表札)
+  box(-3.8, 1.4, -6.8, 3.4, 2.8, .4, 0x4a3526, "gmDoor", world, true); addSign(-3.8, -6.4, "ギルドマスター室");
+  // 待合スペース(手前)
+  for (const [bx, bz] of [[-8, 3.6], [8, 3.6], [-8, 6.2], [8, 6.2]]) bench(bx, bz, 0);
+  box(-10, .5, 5, 2, 1, 1.2, 0x5a4632, "table", world, true); box(10, .5, 5, 2, 1, 1.2, 0x5a4632, "table", world, true);
+  addSign(0, 4.6, "待合 / WAITING");
+  addSign(10, 7.6, "→ 外門練習場(王都南東)");
+  // NPC(固定導線は維持。待合に数人)
+  placeModelNpc("guildReceptionist", "receptionist", 0, -3.3, 0xd8b36b, "受付", "guild_reception", { map: "guildHall" });
+  placeModelNpc("guildmaster", "noble", -3.8, -3.4, 0x4f5d6f, "ギルドマスター", "guildmaster", { map: "guildHall" });
+  addNpc("receptionist", 2.2, -3.3, 0xcab9a0, "ギルド職員", "guild_clerk");
+  addNpc("adventurer", -8, 4.7, 0x8c6f4f, "待機中の冒険者", "guild_lobby");
+  addNpc("adventurer", 8, 4.7, 0x5f7b55, "依頼を選ぶ冒険者", "guild_board");
+  addNpc("merchant", -10, 6, 0x9a6f54, "依頼人", "guild_lobby");
+  locations.push(
+    { id: "reception", name: "受付で登録申請をする", x: 0, z: -3.3, r: 3, dialogue: "guild_reception" },
+    { id: "crystal", name: "魔力測定水晶に触れる", x: 3.6, z: -3.4, r: 2.6, dialogue: "mana_measure" },
+    { id: "guildmaster", name: "ギルドマスターと話す", x: -3.8, z: -3.4, r: 2.8, dialogue: "guildmaster" },
+    { id: "guild_board", name: "依頼掲示板を確認する", x: -10, z: -3, r: 2.6, dialogue: "guild_board" },
+    { id: "guild_exit", name: "王都へ戻る", x: 0, z: 8.7, r: 2, targetMap: "plaza", spawn: { x: 135, z: -42 } }
+  );
+}
 function buildChurch() { setEnv(0x151823, 12, 36); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x5b5a55, "stone"); world.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1d28, 1.7)); const glow = new THREE.PointLight(0xbfd4ff, 6, 20, 2); glow.position.set(0, 3.4, -3); world.add(glow); room(14, 14, 4, 0x44434a); box(0, .55, -4.4, 3.8, 1.05, 1.25, 0xddd1ae, "altar", world, true); for (let i = 0; i < 4; i++) { box(-2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); box(2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); } placeModelNpc("priest", "priest", 0, -2.5, 0xc9c4ad, "司祭", "church", { map: "church" }); locations.push({ id: "church_record_seat", name: "司祭に身分記録を相談する", x: 0, z: -2.5, r: 3, dialogue: "church" }, { id: "church_exit", name: "前庭へ戻る", x: 0, z: 6.4, r: 2.4, targetMap: "churchGrounds", spawn: { x: 0, z: -46 } }); }
 // 大聖堂前庭(別マップ): 大聖堂ファサード・双塔/尖塔・ステンドグラス調の窓・庭園・噴水・記録所(内部へ接続)・司祭/記録官/信徒。軽量。
 function buildChurchGrounds() {
@@ -677,11 +736,93 @@ function academyDistrict(x, z) { house(x, z, 40, 28, 20, 0x8a8fb0, "ACADEMY", tr
 const SHOP_T = { weapon: { name: "武器屋", wall: 0x6a5a4a, accent: 0x8a9098, keeper: "blacksmith", kname: "武器屋の主", dlg: "shop_weapon" }, armor: { name: "防具屋", wall: 0x5a6068, accent: 0xb6bcc6, keeper: "merchant", kname: "防具屋の主", dlg: "shop_armor" }, potion: { name: "薬屋", wall: 0x4a6a5a, accent: 0x6fcf8f, keeper: "merchant", kname: "薬師", dlg: "shop_potion" }, magicshop: { name: "魔法具店", wall: 0x4a4a6a, accent: 0x8fbfff, keeper: "teacher", kname: "魔法具商", dlg: "shop_magic" }, bakery: { name: "パン屋", wall: 0x8a6a44, accent: 0xe0b870, keeper: "merchant", kname: "パン屋", dlg: "shop_bakery" }, inn: { name: "宿屋 曲がった匙亭", wall: 0x7a5a3a, accent: 0xd8b36b, keeper: "merchant", kname: "女将マルタ", dlg: "inn_gate", enter: 1 }, tavern: { name: "酒場", wall: 0x6a4438, accent: 0xc8763a, keeper: "merchant", kname: "酒場の主", dlg: "shop_tavern" }, records: { name: "記録所", wall: 0x6a6458, accent: 0xd8c89a, keeper: "noble", kname: "記録官", dlg: "shop_records" } };
 function shopfront(x, z, angle, type) { const T = SHOP_T[type]; house(x, z, 16, 13, rand(8, 11), T.wall, T.name, true, angle); const fx = Math.sin(angle), fz = Math.cos(angle); const aw = box(x + fx * 6.6, 2.6, z + fz * 6.6, 4.4, .16, 1.6, T.accent, "", world); aw.rotation.y = angle; addNpc(T.keeper, x + fx * 7.4, z + fz * 7.4, T.wall, T.kname, T.dlg); shopAnchors.push([x, z, 13]); if (T.enter) locations.push({ id: T.dlg, name: T.name + "に入る", x: x + fx * 6.8, z: z + fz * 6.8, r: 5, dialogue: T.dlg }); }
 function shoppingStreet() { for (const [t, x] of [["weapon", 70], ["armor", 110], ["potion", 150], ["magicshop", 190]]) shopfront(x, -22, faceToward(0, 1), t); for (const [t, x] of [["inn", 70], ["tavern", 110], ["records", 150], ["bakery", 190]]) shopfront(x, 22, faceToward(0, -1), t); for (let i = 0; i < 6; i++) { lamp(52 + i * 28, -11); lamp(52 + i * 28, 11); } for (let i = 0; i < 5; i++) addNpc(pick(["merchant", "traveler", "adventurer"]), rand(55, 200), rand(-10, 10), pick([0x8c6f4f, 0x7f9fbd, 0x6f8aa6]), "通行人", "townsfolk"); }
-function buildInn() { setEnv(0x241a16, 12, 38); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x4a3a2a, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.85)); const t = new THREE.PointLight(0xffb86a, 8, 22, 2); t.position.set(0, 3.4, -1); world.add(t); room(14, 14, 3.6, 0x3a2a22); box(0, .6, -4.6, 5.4, 1.2, 1.1, 0x6a4a2c, "counter", world, true); for (let i = 0; i < 3; i++) box(-4.5 + i * 4.5, .4, 3.8, 2.4, .7, 1.4, 0x5a4632, "table", world, true); for (const [bx, bz] of [[-2, -2.6], [2, -2.6]]) box(bx, .35, bz, 2, .6, 1.6, 0x4a3320, "bench", world, true); placeModelNpc("innMarta", "merchant", 0, -3.4, 0xd8b36b, "女将マルタ", "inn_marta", { map: "inn" }); addNpc("adventurer", -3.6, 2, pick([0x8c6f4f, 0x58718d]), "酒場の客", "townsfolk"); addNpc("slum", 3.6, 2.4, 0x6a5a4a, "酔っ払い", "townsfolk"); locations.push({ id: "inn_marta", name: "女将マルタと話す", x: 0, z: -3.4, r: 3, dialogue: "inn_marta" }, { id: "inn_exit", name: "外へ出る", x: 0, z: 6.4, r: 2.4, targetMap: "plaza", spawn: { x: 70, z: 30 } }); }
+// #48 宿屋・酒場「曲がった匙亭」: 受付/食堂酒場/客席/客室入口/噂掲示板/2階風階段 を持つ滞在・情報拠点。
+function buildInn() {
+  setEnv(0x241a16, 12, 40); bounds = { minX: -11, maxX: 11, minZ: -9, maxZ: 9 };
+  ground(24, 20, 0x4a3a2a, "plank");
+  world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.9));
+  for (const [lx, lz] of [[0, -1], [-7, 3], [7, 3]]) { const t = new THREE.PointLight(0xffb86a, 6, 18, 2); t.position.set(lx, 3.4, lz); world.add(t); }
+  room(24, 20, 3.5, 0x3a2a22);
+  // 受付カウンター(女将)
+  box(0, .6, -4.8, 5.4, 1.2, 1.1, 0x6a4a2c, "counter", world, true);
+  box(0, 1.3, -6.4, 5.6, 2.4, .4, 0x5a3d27, "shelf", world, true); addSign(0, -6.2, "受付 / 曲がった匙亭");
+  // 食堂・酒場スペース(卓と客席)
+  for (let i = 0; i < 4; i++) box(-6 + i * 4, .5, 2.6, 1.8, 1, 1.8, 0x5a4632, "table", world, true);
+  for (const [bx, bz] of [[-6, .6], [-6, 4.6], [-2, .6], [-2, 4.6], [2, .6], [2, 4.6], [6, .6], [6, 4.6]]) bench(bx, bz, 0);
+  // 樽・酒棚(酒場)
+  barrel(-9, -2); barrel(-9, 0); box(-9.6, 1.2, -4, .6, 2.4, 2, 0x4a3320, "barShelf", world, true);
+  // 噂掲示板
+  box(8.6, 1.3, -3, .3, 2, 2.4, 0x4a301c, "rumorBoard", world, true); addSign(8.6, -5, "噂掲示板");
+  // 客室入口＋2階風階段
+  for (let i = 0; i < 5; i++) box(9.4, .3 + i * .42, 6 - i * .8, 2, .42, .8, 0x5a4632, "stair", world, true); addSign(9.4, 8.2, "客室(2階)");
+  box(-9.6, 1.4, 6.6, 1, 2.8, 2.4, 0x4a3320, "roomDoor", world, true); addSign(-9.6, 4.4, "客室入口");
+  // NPC: 女将(固定) + 噂NPC
+  placeModelNpc("innMarta", "merchant", 0, -3.4, 0xd8b36b, "女将マルタ", "inn_marta", { map: "inn" });
+  addNpc("merchant", -6, 1.9, 0x9a6f54, "旅商人", "inn_traveler");
+  addNpc("adventurer", -2, 3.7, 0x8c6f4f, "宿の冒険者", "inn_adventurer");
+  addNpc("student", 2, 1.9, 0x2e3a5c, "学院生", "inn_student");
+  addNpc("faithful", 6, 3.7, 0xc9c4ad, "教会関係者", "inn_cleric");
+  addNpc("guard", 6, 1.5, 0xb77954, "非番の兵士", "inn_soldier");
+  locations.push(
+    { id: "inn_marta", name: "女将マルタと話す", x: 0, z: -3.4, r: 3, dialogue: "inn_marta" },
+    { id: "inn_board", name: "噂掲示板を読む", x: 8.6, z: -3, r: 2.6, dialogue: "inn_board" },
+    { id: "inn_exit", name: "外へ出る", x: 0, z: 8.4, r: 2, targetMap: "plaza", spawn: { x: 70, z: 30 } }
+  );
+}
+// #51 裏路地: 狭い路地/井戸/洗濯物/木箱・樽/市民NPC/裏口・行き止まり。王都の生活感の小区画。
+function buildBackstreet() {
+  setEnv(0x9aa6ad, 30, 360); bounds = { minX: -22, maxX: 22, minZ: -30, maxZ: 22 };
+  ground(50, 64, 0x6a6052, "dirt");
+  road(0, -4, 7, 52, 0x6b6255, "dirt"); // 細い路地
+  for (let z = -26; z <= 16; z += 8) {
+    house(-15, z, 9, 7, rand(6, 9), pick([0x7b5a3d, 0x6d5d4a, 0x83684d]), null, false, faceToward(1, 0));
+    house(15, z + 4, 9, 7, rand(6, 9), pick([0x83684d, 0x7b5a3d, 0x6d5d4a]), null, false, faceToward(-1, 0));
+  }
+  well(-4, -8); // 井戸・水場
+  for (const [hx, hz] of [[-8, 2], [7, -10], [-7, -18]]) { cyl(hx, 1.8, hz, .04, .1, 0x4a3320, "", world); for (let i = 0; i < 4; i++) { const c = box(hx + .6 + i * .5, 1.5, hz, .4, .5, .04, pick([0xc8c2b0, 0xb44a5a, 0x4a86c0, 0x5fae6a]), "", world); c.rotation.z = .04; } } // 洗濯物
+  for (let i = 0; i < 5; i++) crates(rand(-12, 12), rand(-24, 14), Math.floor(rand(2, 4)));
+  for (let i = 0; i < 3; i++) barrel(rand(-11, 11), rand(-22, 12));
+  lamp(-6, -2); lamp(6, -14); brazier(9, 6);
+  addSign(0, 18, "裏路地 / BACK STREET");
+  box(0, 1.4, -28, 6, 2.8, .6, 0x3a2c20, "deadend", world, true); addSign(0, -25, "行き止まり");
+  box(-19, 1.4, -10, .6, 2.8, 3, 0x4a3320, "backdoor", world, true); addSign(-19, -7, "裏口(施錠)");
+  // 市民NPC(生活感) + 情報屋(alley進行を維持)
+  addNpc("slum", -4, -3, 0x4f4238, "路地の住人", "alley_warn");
+  addNpc("traveler", 4, -1, 0x7f6f8d, "井戸端の女", "alley_guild");
+  addNpc("slum", -6, -16, 0x5d4b39, "古株の住人", "alley_church");
+  addNpc("merchant", 6, 8, 0x9a6f54, "路地の小商人", "alley_market");
+  addNpc("slum", 8, -20, 0x4a4038, "声をひそめる男", "alley_watch");
+  addNpc("slum", 0, -10, 0x6a5a4a, "路地裏の男", "alley");
+  locations.push(
+    { id: "alley", name: "情報屋に接触する", x: 0, z: -10, r: 3, dialogue: "alley" },
+    { id: "backstreet_well", name: "井戸の水場を見る", x: -4, z: -8, r: 2.6, dialogue: "backstreet" },
+    { id: "backstreet_exit", name: "大通りへ戻る", x: 0, z: 20, r: 2.4, targetMap: "plaza", spawn: { x: -390, z: 235 } }
+  );
+}
 
 function cityWall() { for (const [x, z, w, d] of [[0, -675, 1320, 10], [0, 675, 1320, 10], [-675, 0, 10, 1320], [675, 0, 10, 1320]]) box(x, 5, z, w, 10, d, 0x6d6c64, "wall", world, true); for (let i = -620; i <= 620; i += 75) { box(i, 10, -675, 10, 18, 10, 0x74736b, "tower", world, true); box(i, 10, 675, 10, 18, 10, 0x74736b, "tower", world, true); box(-675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); box(675, 10, i, 10, 18, 10, 0x74736b, "tower", world, true); } }
 function addGate(x, z) { box(x, 4, z, 38, 8, 7, 0x6d6c64, "gate", world, true); box(x - 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); box(x + 15, 11, z, 7, 18, 10, 0x74736b, "tower", world, true); }
 function gateDistrict(x, z) { addGate(x, z + 55); for (let i = -2; i <= 2; i++) addNpc("guard", x + i * 6, z - 8, 0xb77954, "衛兵", "north_gate"); box(x - 22, 2, z - 25, 20, 4, 14, 0x6a5e52, "checkpoint", world, true); box(x + 22, 2, z - 25, 20, 4, 14, 0x6a5e52, "checkpoint", world, true); }
+// #50 北門詰所: 検問カウンター/記録机/武器棚/待機ベンチ/衛兵詰所/事情聴取室 を門前に配置。
+// north_gate の進行(merchant/gate, 紹介状必須, progress_guard/north_gate_check)は不変。
+function gateCheckpoint(gx, gz) {
+  const z0 = gz + 8; // 検問エリアは門の手前(+z側)
+  box(gx - 6, .6, z0, 5, 1.2, 1.2, 0x6a5a3f, "checkpoint", world, true);   // 検問カウンター
+  box(gx + 7, .55, z0 + 1, 3, 1.1, 1.6, 0x5a4632, "deskRec", world, true); // 記録机
+  box(gx - 13, 1.1, z0 + 2, 1, 2.2, 4, 0x4a3a2a, "rack", world, true);     // 武器棚/装備置き場
+  for (let i = 0; i < 3; i++) { const sp = cyl(gx - 12.6, 1.2, z0 + .8 + i * 1.2, .05, 2.2, 0x6e5134, "", world); sp.rotation.z = .05; }
+  bench(gx + 12, z0 + 3, 0); bench(gx + 12, z0 + 5, 0);                     // 待機ベンチ
+  house(gx - 24, z0 + 4, 16, 12, 7, 0x6a5e52, "GATE POST", true, faceToward(0, -1)); // 衛兵詰所
+  addSign(gx - 24, z0 - 2.5, "衛兵詰所");
+  box(gx + 21, 2, z0 + 6, 8, 4, 8, 0x5e564a, "office", world, true); addSign(gx + 21, z0 + 1, "事情聴取室"); // 小部屋
+  lamp(gx - 8, z0); lamp(gx + 9, z0);
+  addNpc("noble", gx + 7, z0 + 2.4, 0xd8c89a, "記録係", "gate_record");
+  addNpc("guard", gx - 6, z0 - 1.4, 0xb77954, "検問の衛兵", "north_gate");
+  locations.push(
+    { id: "gate_record", name: "記録机で記帳を確認する", x: gx + 7, z: z0 + 1, r: 3, dialogue: "gate_record" },
+    { id: "gate_notice", name: "詰所の掲示を読む", x: gx - 24, z: z0 - 2.5, r: 3, dialogue: "gate_notice" }
+  );
+}
 const WALL_P = [0xd8c59f, 0xcbb58b, 0xbfa884, 0xd4c2aa, 0xb69b74, 0xc9b189, 0xa98f6b, 0xd0b79a];
 const ROOF_P = [0x8a3f2a, 0x7a3527, 0x6d3d31, 0x4f4654, 0x34506a, 0x5f3d2d, 0x9c5a38];
 function nearRoadLine(x, z, m) { for (const r of ROAD_LINES.vertical) if (Math.abs(x - r) < (r === 0 ? 15 : m)) return true; for (const r of ROAD_LINES.horizontal) if (Math.abs(z - r) < (r === 0 ? 15 : m)) return true; return false; }
@@ -935,11 +1076,11 @@ function updateHud() {
   const objText = (state.debug ? "[DEBUG FLY] " : "") + (data.objective || "ギルドへ向かう");
   ui.objective.textContent = objText;
   if (ui.banner.objective) ui.banner.objective.textContent = objText;
-  const areaNames = { plaza: "王都アウレリア城下町", guildHall: "冒険者ギルド内部", trainingGround: "外門練習場", academy: "王立魔法学院 講義棟", academyCampus: "王立魔法学院 キャンパス", church: "教会記録所", churchGrounds: "大聖堂 前庭", inn: "宿屋 曲がった匙亭", forestRoad: "王都へ続く森の街道" };
+  const areaNames = { plaza: "王都アウレリア城下町", guildHall: "冒険者ギルド会館", trainingGround: "外門練習場", academy: "王立魔法学院 講義棟", academyCampus: "王立魔法学院 キャンパス", church: "教会記録所", churchGrounds: "大聖堂 前庭", inn: "宿屋 曲がった匙亭", backstreet: "王都 裏路地", forestRoad: "王都へ続く森の街道" };
   const areaText = (areaNames[state.map] || data.maps?.[state.map]?.name || "王都へ続く森の街道") + (DAYPHASES[state.timeOfDay] ? "　・　" + DAYPHASES[state.timeOfDay].label : "");
   ui.area.textContent = areaText;
   if (ui.banner.area) ui.banner.area.textContent = areaText;
-  const minimaps = { plaza: "[北門]\n  |\n[市場]-[中央広場]-[職人区]\n  |      |\n[スラム]-[ギルド]-[訓練場]\n  |\n[教会]-[学院]-[貴族街]-[王城]", guildHall: "[受付]-[水晶]\n   |\n[ギルドマスター]\n   |\n[出口]", trainingGround: "[入口]-[的]-[模擬戦]", academy: "[書架]-[魔導具]\n   |\n[教師]-[学院生]\n   |\n[出口→キャンパス]", academyCampus: "[講義棟]-[塔]\n   |\n[中庭/噴水]-[練習場]\n   |\n[正門→王都]", inn: "[客]-[女将]-[酔っ払い]\n   |\n[出口]", church: "[祭壇]\n  |\n[記録係]\n  |\n[出口→前庭]", churchGrounds: "[大聖堂]-[尖塔]\n   |\n[記録所]-[庭園/噴水]\n   |\n[正門→王都]", forestRoad: "[森の街道]--[荷車]--[王都門]" };
+  const minimaps = { plaza: "[北門]\n  |\n[市場]-[中央広場]-[職人区]\n  |      |\n[スラム]-[ギルド]-[訓練場]\n  |\n[教会]-[学院]-[貴族街]-[王城]", guildHall: "[掲示板] [受付] [測定室]\n        |\n[ギルマス室]-[待合]\n        |\n     [出口→王都]", trainingGround: "[入口]-[的]-[模擬戦]", academy: "[書架]-[魔導具]\n   |\n[教師]-[学院生]\n   |\n[出口→キャンパス]", academyCampus: "[講義棟]-[塔]\n   |\n[中庭/噴水]-[練習場]\n   |\n[正門→王都]", inn: "[受付/女将] [酒場]\n        |\n[噂掲示板]-[客席]\n        |\n[客室階段] [出口]", church: "[祭壇]\n  |\n[記録係]\n  |\n[出口→前庭]", churchGrounds: "[大聖堂]-[尖塔]\n   |\n[記録所]-[庭園/噴水]\n   |\n[正門→王都]", backstreet: "[行き止まり]\n   |\n[情報屋]-[井戸]\n   |\n[裏路地]-[出口→大通り]", forestRoad: "[森の街道]--[詰所/荷車]--[北門検問]" };
   ui.map.textContent = minimaps[state.map] || data.maps?.[state.map]?.minimap || "[森の街道] -- [王都門]";
   syncPermits();
   syncProgressHotbar();

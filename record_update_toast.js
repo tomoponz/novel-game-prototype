@@ -65,6 +65,16 @@
     seen = current;
   }
 
+  // 正式なイベント発火を優先(即時)。700ms pollingは保険として残す。seenで二重通知を防止。
+  addEventListener("aurelia:record", (e) => {
+    const id = e.detail?.id;
+    if (!id || !WATCH[id]) return;
+    if (!baselineReady) { seen.add(id); return; }
+    if (seen.has(id)) return;
+    notify(id);
+    seen.add(id);
+  });
+
   setInterval(tick, 700);
 
   window.__AURELIA_RECORD_UPDATE__ = {

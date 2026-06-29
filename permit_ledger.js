@@ -77,9 +77,11 @@
   function toggle() { setVisible(!visible); }
 
   addEventListener("keydown", (e) => {
+    if (e.code === "Escape" && visible) { e.preventDefault(); e.stopImmediatePropagation(); setVisible(false); return; }
     if (e.code !== "KeyP") return;
     const s = state();
     if (!s?.started) return;
+    if (!visible && (s.inDialogue || s.menuOpen)) return; // 会話・メニュー中は新規に開かない(競合回避)
     e.preventDefault();
     toggle();
   }, true);

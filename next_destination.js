@@ -7,6 +7,8 @@
     guildHall: { minX: -8, maxX: 8, minZ: -7, maxZ: 7, label: "GUILD" },
     church: { minX: -7, maxX: 7, minZ: -7, maxZ: 7, label: "CHURCH" },
     academy: { minX: -9, maxX: 9, minZ: -8, maxZ: 8, label: "ACADEMY" },
+    academyCampus: { minX: -68, maxX: 68, minZ: -92, maxZ: 66, label: "ACADEMY CAMPUS" },
+    churchGrounds: { minX: -60, maxX: 60, minZ: -90, maxZ: 70, label: "CATHEDRAL" },
     inn: { minX: -7, maxX: 7, minZ: -6, maxZ: 6, label: "INN" }
   };
 
@@ -21,7 +23,9 @@
     guildHall: [{ x: 0, z: -3.3, label: "受付" }, { x: 3.6, z: -3.4, label: "水晶" }, { x: 0, z: 6.7, label: "出口" }],
     trainingGround: [{ x: -8, z: 12, label: "教官" }, { x: 10, z: -8, label: "模擬" }, { x: 0, z: 52, label: "出口" }],
     academy: [{ x: 0, z: -3.7, label: "教師" }, { x: 0, z: 7.2, label: "出口" }],
-    church: [{ x: 0, z: -2.5, label: "記録" }, { x: 0, z: 5.5, label: "出口" }],
+    academyCampus: [{ x: 0, z: -52, label: "講義棟" }, { x: 42, z: -52, label: "塔" }, { x: 46, z: 24, label: "練習場" }, { x: 0, z: 62, label: "正門" }],
+    church: [{ x: 0, z: -2.5, label: "記録" }, { x: 0, z: 6.4, label: "出口" }],
+    churchGrounds: [{ x: 0, z: -66, label: "大聖堂" }, { x: 0, z: -52, label: "記録所" }, { x: 0, z: 60, label: "正門" }],
     inn: [{ x: 0, z: -2.7, label: "女将" }, { x: 0, z: 5.4, label: "出口" }]
   };
 
@@ -37,6 +41,7 @@
     { keys: ["教会", "身分", "確認書"], target: { map: "plaza", x: -185, z: -85, label: "教会" } },
     { keys: ["市場", "盗難"], target: { map: "plaza", x: 285, z: 85, label: "市場" } },
     { keys: ["路地裏", "情報屋"], target: { map: "plaza", x: -390, z: 235, label: "路地裏" } },
+    { keys: ["講義棟", "キャンパス"], target: { map: "academyCampus", x: 0, z: -52, label: "講義棟" } },
     { keys: ["魔法学院", "学院", "入学相談"], target: { map: "plaza", x: -300, z: -60, label: "魔法学院" } },
     { keys: ["宿屋", "休ん"], target: { map: "plaza", x: 55, z: 150, label: "宿屋" } }
   ];

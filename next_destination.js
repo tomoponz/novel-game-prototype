@@ -19,7 +19,8 @@
       { x: 0, z: 610, label: "北門" }, { x: 0, z: 0, label: "広場" },
       { x: 135, z: -70, label: "ギルド" }, { x: 285, z: 85, label: "市場" },
       { x: -185, z: -85, label: "教会" }, { x: -300, z: -60, label: "学院" },
-      { x: 380, z: 330, label: "訓練" }, { x: 0, z: -620, label: "王城" }
+      { x: 380, z: 330, label: "訓練" }, { x: 0, z: -620, label: "王城" },
+      { x: 78, z: -92, label: "案内板" }, { x: 0, z: 82, label: "周辺街路" }
     ],
     forestRoad: [{ x: 6, z: 15, label: "荷車" }, { x: 0, z: -108, label: "北門" }],
     guildHall: [{ x: 0, z: -3.3, label: "受付" }, { x: 3.6, z: -3.4, label: "水晶" }, { x: 0, z: 6.7, label: "出口" }],
@@ -37,6 +38,10 @@
     { keys: ["荷車", "襲撃"], target: { map: "forestRoad", x: 6, z: 15, label: "荷車襲撃" } },
     { keys: ["北門", "検問"], target: { map: "forestRoad", x: 0, z: -108, label: "北門" } },
     { keys: ["中央広場", "王都の構造"], target: { map: "plaza", x: 0, z: 0, label: "中央広場" } },
+    { keys: ["行政庁", "王城区方面"], target: { map: "plaza", x: -34, z: -78, label: "行政庁・王城区方面" } },
+    { keys: ["商会方面", "市場通り"], target: { map: "plaza", x: 78, z: -34, label: "市場通り・商会方面" } },
+    { keys: ["学院通り"], target: { map: "plaza", x: -78, z: 34, label: "学院通り" } },
+    { keys: ["大聖堂", "記録所方面"], target: { map: "plaza", x: -34, z: 78, label: "大聖堂・記録所方面" } },
     { keys: ["ギルド", "登録申請"], target: { map: "plaza", x: 135, z: -70, label: "ギルド" } },
     { keys: ["測定台", "水晶", "魔力測定"], target: { map: "guildHall", x: 3.6, z: -3.4, label: "測定水晶" } },
     { keys: ["ギルドマスター"], target: { map: "guildHall", x: -3.8, z: -3.4, label: "ギルドマスター" } },

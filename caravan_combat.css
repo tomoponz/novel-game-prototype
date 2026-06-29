@@ -1,0 +1,142 @@
+.caravan-combat-panel {
+  position: fixed;
+  z-index: 16;
+  left: 50%;
+  top: 86px;
+  width: min(430px, calc(100vw - 28px));
+  padding: 10px 12px 12px;
+  border: 1px solid rgba(255, 95, 73, .42);
+  border-radius: 14px;
+  background: rgba(14, 10, 9, .72);
+  box-shadow: 0 18px 46px rgba(0,0,0,.38);
+  color: var(--paper);
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -8px);
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+  transition: opacity .16s ease, visibility .16s ease, transform .16s ease;
+}
+
+.caravan-combat-panel.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+.caravan-combat-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 7px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.caravan-combat-title {
+  color: #ffd06b;
+  font-size: 12px;
+}
+
+.caravan-combat-phase {
+  color: rgba(246,239,225,.72);
+  font: 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.caravan-combat-hp {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.14);
+}
+
+.caravan-combat-hp > i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff5f49, #ffd06b);
+  transform-origin: left center;
+  transition: transform .16s ease;
+}
+
+.caravan-combat-message {
+  margin-top: 7px;
+  color: rgba(246,239,225,.82);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.caravan-combat-warning {
+  position: fixed;
+  z-index: 15;
+  left: 50%;
+  top: 50%;
+  width: min(420px, 74vw);
+  height: 76px;
+  border: 1px solid rgba(255, 59, 48, .58);
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 59, 48, .24), transparent);
+  box-shadow: 0 0 26px rgba(255, 59, 48, .28) inset, 0 0 18px rgba(255, 59, 48, .18);
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -50%) scale(.86);
+  pointer-events: none;
+  transition: opacity .12s ease, visibility .12s ease, transform .12s ease;
+}
+
+.caravan-combat-warning.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+  animation: caravan-warning-pulse .42s ease-in-out infinite alternate;
+}
+
+.caravan-combat-bolt {
+  position: fixed;
+  z-index: 17;
+  left: 50%;
+  top: 57%;
+  width: 180px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,208,107,0), #ffd06b, #ff5f49);
+  box-shadow: 0 0 18px rgba(255, 126, 48, .85);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(-9deg) scaleX(.2);
+}
+
+.caravan-combat-bolt.is-visible {
+  animation: caravan-bolt .24s ease-out forwards;
+}
+
+body.caravan-combat-hit #game-canvas {
+  filter: brightness(1.22) saturate(1.2);
+}
+
+body.caravan-combat-damaged #game-canvas {
+  filter: brightness(.9) sepia(.3) saturate(1.8);
+}
+
+@keyframes caravan-warning-pulse {
+  from { box-shadow: 0 0 18px rgba(255, 59, 48, .22) inset, 0 0 10px rgba(255, 59, 48, .14); }
+  to { box-shadow: 0 0 32px rgba(255, 59, 48, .42) inset, 0 0 24px rgba(255, 59, 48, .28); }
+}
+
+@keyframes caravan-bolt {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(-9deg) scaleX(.2); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(-9deg) scaleX(1.35); }
+}
+
+@media (max-width: 820px) {
+  .caravan-combat-panel {
+    top: 58px;
+    padding: 9px 10px;
+  }
+  .caravan-combat-message { font-size: 11px; }
+  .caravan-combat-warning { height: 58px; }
+}

@@ -18,6 +18,7 @@
   };
 
   let lastTick = performance.now();
+  let lastObjective = "";
   let ui = null;
 
   function debug() { return window.__AURELIA_DEBUG__; }
@@ -61,9 +62,15 @@
     return { info, state: s, d };
   }
 
-  function setObjective(text) {
-    if (window.GAME_DATA) window.GAME_DATA.objective = text;
+  function refreshHud() {
     try { debug()?.complete?.(); } catch {}
+  }
+
+  function setObjective(text, force = false) {
+    if (!force && text === lastObjective) return;
+    lastObjective = text;
+    if (window.GAME_DATA) window.GAME_DATA.objective = text;
+    refreshHud();
   }
 
   function setPhase(phase, timer, message) {
@@ -124,7 +131,7 @@
     s.player.mp = Math.max(0, s.player.mp - cost);
     if (kind === "burst") s.burstCooldown = Math.max(s.burstCooldown || 0, .55);
     else s.fireCooldown = Math.max(s.fireCooldown || 0, .24);
-    try { debug()?.complete?.(); } catch {}
+    refreshHud();
     return true;
   }
 
@@ -146,7 +153,7 @@
     combat.hp = Math.max(0, combat.hp - damage);
     flash("caravan-combat-hit", 150);
     setPhase("stagger", .62, combat.hp > 0 ? `命中。あと${combat.hp}発分で退けられる。` : "黒毛の噛み犬が崩れた。商人を救助した。");
-    setObjective(combat.hp > 0 ? `黒毛の噛み犬の突進を避け、火球をあと${combat.hp}発分当てる` : "商人エドリックの紹介状を持って北門へ向かう");
+    setObjective(combat.hp > 0 ? `黒毛の噛み犬の突進を避け、火球をあと${combat.hp}発分当てる` : "商人エドリックの紹介状を持って北門へ向かう", true);
     if (combat.hp <= 0) defeat();
     updateUi();
   }
@@ -197,7 +204,7 @@
     combat.damageLock = 1.2;
     combat.message = "突進を受けた。予兆が出たら横移動かKキー回避。";
     flash("caravan-combat-damaged", 220);
-    try { debug()?.complete?.(); } catch {}
+    refreshHud();
   }
 
   function updateCombat(dt) {
@@ -207,9 +214,9 @@
     combat.damageLock = Math.max(0, combat.damageLock - dt);
     combat.timer -= dt;
     if (combat.timer <= 0) {
-      if (combat.phase === "idle") setPhase("telegraph", .95, "赤い予兆が見えた。突進を横に避けろ。Kキー回避も使える。");
-      else if (combat.phase === "telegraph") setPhase("charge", .34, "噛み犬が突進してくる。横へ逃げろ。"), maybeDamage(active.info, true);
-      else if (combat.phase === "charge") setPhase("cooldown", .82, "突進後の隙だ。TARGETを正面に入れて火球を撃て。"), maybeDamage(active.info, false);
+      if (combat.phase === "idle") setPhase("telegraph", .95, "赤い予兆が見えた。突進を横に避けろ。Kキー回避も使える。" );
+      else if (combat.phase === "telegraph") { setPhase("charge", .34, "噛み犬が突進してくる。横へ逃げろ。" ); maybeDamage(active.info, true); }
+      else if (combat.phase === "charge") { setPhase("cooldown", .82, "突進後の隙だ。TARGETを正面に入れて火球を撃て。" ); maybeDamage(active.info, false); }
       else if (combat.phase === "cooldown") setPhase("idle", 1.15, "距離を取り、予兆を見てから火球を当てる。" );
       else if (combat.phase === "stagger") setPhase("cooldown", .75, "怯んだ。次の突進前にもう一発狙える。" );
     }

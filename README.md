@@ -236,6 +236,22 @@ Branch `feature/resolve-open-gameplay-issues-20260629` advances open issues
   link the plaza to the existing academy/church interiors.
 - #17 Capital scale expansion: the four-block plan is defined as a staged
   production unit for expanding central Aurelia to roughly 4x scale, not as four
-  themed/factional districts. Phase 1 adds central-plaza street cues, guide
-  signs, small shops/homes/props, and flavor NPCs; see
+  themed/factional districts. Phase 1 adds central-plaza street cues; Phase 2
+  adds `administrativeStreet` with the permit bureau, records window, guard
+  post, homes, stalls, and waiting citizens; see
   `docs/world/capital-scale-expansion-plan.md`.
+
+## World planning issue notes (#52–#55)
+
+- #52 Overworld plan: `docs/world/kingdom-overworld-plan.md` defines the
+  Magitech Kingdom, major regions, controlling institutions, access conditions,
+  chapter fit, and implementation priority.
+- #53 World map UI: `world_map.js` provides a lightweight O-key kingdom map with
+  region cards, unlock state, missing-record reasons, and travel only to
+  implemented maps.
+- #54 Region access rules: `docs/world/region-access-rules.md` maps major
+  regions to permit/trust/record conditions and keeps the four-block plan scoped
+  to Aurelia's central city expansion.
+- #55 Long-term roadmap: `docs/story/long-term-roadmap.md` outlines chapters 1
+  through 8+ without treating the academy as the kingdom itself or implementing
+  all future regions at once.

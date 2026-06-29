@@ -889,6 +889,16 @@ function bindMenu() { ui.menuClose?.addEventListener("click", closeMenu); ui.men
 function bindAudioToggle() { if (!ui.audioToggle) return; ui.audioToggle.addEventListener("change", () => { audio.enable(); audio.setMuted(!ui.audioToggle.checked); }); }
 window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
 peek: () => ({ cam: camera.position.toArray().map((n) => +n.toFixed(1)), dir: (() => { const d = new THREE.Vector3(); camera.getWorldDirection(d); return d.toArray().map((n) => +n.toFixed(2)); })(), balls: projectiles.map((p) => { const ndc = p.ball.position.clone().project(camera); return { pos: p.ball.position.toArray().map((n) => +n.toFixed(1)), visible: p.ball.visible, inScene: !!p.ball.parent, emis: p.ball.material.emissiveIntensity, ndc: [+ndc.x.toFixed(2), +ndc.y.toFixed(2), +ndc.z.toFixed(2)] }; }) }) };
+// 公式ミニマップAPI(読み取り専用): next_destination.js はこれを優先利用し、cameraからの近似(approx)位置を使わない。
+window.__AURELIA_MINIMAP__ = () => ({
+  map: state.map,
+  x: player.position.x,
+  z: player.position.z,
+  yaw: state.yaw,
+  pitch: state.pitch,
+  objective: data.objective || "",
+  active: state.active ? { id: state.active.id || null, name: state.active.name || null, dialogue: state.active.dialogue || null, targetMap: state.active.targetMap || state.active.map || null } : null
+});
 addEventListener("keydown", (e) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault(); if (state.inDialogue) { if (e.code === "ArrowDown") { moveChoice(1); return; } if (e.code === "ArrowUp") { moveChoice(-1); return; } if (e.code === "Escape") return closeDialogue(true); if (e.code === "Enter" || e.code === "Space") return advance(); return; } if (state.menuOpen) { if (e.code === "Escape") closeMenu(); return; } if (e.code === "Escape") { toggleMenu(); return; } if (e.code === "KeyF") state.cameraMode = state.cameraMode === "third" ? "first" : "third"; if (e.code === "Backquote" || e.code === "F3") { state.debug = !state.debug; updateHud(); } if (e.code === "KeyT") setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); if (e.code === "KeyE" && state.active) interact(); if (/^Digit[1-9]$/.test(e.code)) selectSlot(+e.code.slice(5)); state.keys.add(e.code); });
 addEventListener("keyup", (e) => state.keys.delete(e.code));
 ui.canvas.addEventListener("pointerdown", (e) => { state.drag = true; state.lastX = e.clientX; state.lastY = e.clientY; });

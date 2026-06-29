@@ -1,0 +1,136 @@
+.north-gate-check-panel {
+  position: fixed;
+  z-index: 18;
+  right: 18px;
+  bottom: 108px;
+  width: min(410px, calc(100vw - 36px));
+  padding: 13px 14px 14px;
+  border: 1px solid rgba(143, 191, 255, .45);
+  border-radius: 16px;
+  background: rgba(8, 13, 18, .8);
+  box-shadow: 0 20px 52px rgba(0, 0, 0, .42), inset 0 0 28px rgba(143, 191, 255, .08);
+  color: var(--paper);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+  transition: opacity .18s ease, visibility .18s ease, transform .18s ease;
+}
+
+.north-gate-check-panel.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.north-gate-check-kicker {
+  margin: 0 0 7px;
+  color: #8fbfff;
+  font: 800 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .14em;
+}
+
+.north-gate-check-title {
+  margin: 0 0 10px;
+  color: #fff1ce;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.north-gate-check-grid {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.north-gate-check-grid li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .055);
+  color: rgba(246, 239, 225, .84);
+}
+
+.north-gate-check-grid b {
+  color: rgba(246, 239, 225, .58);
+  font-weight: 700;
+}
+
+.north-gate-check-grid span {
+  text-align: right;
+  color: #ffd06b;
+  font-weight: 800;
+}
+
+.north-gate-check-note {
+  margin: 9px 0 0;
+  color: rgba(246, 239, 225, .74);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.north-gate-seal {
+  position: fixed;
+  z-index: 17;
+  right: 54px;
+  bottom: 84px;
+  width: 92px;
+  height: 92px;
+  border: 2px solid rgba(255, 208, 107, .72);
+  border-radius: 50%;
+  box-shadow: 0 0 24px rgba(255, 208, 107, .24), inset 0 0 28px rgba(255, 208, 107, .18);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: rotate(-11deg) scale(.8);
+}
+
+.north-gate-seal::before {
+  content: "APPROVED";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 208, 107, .9);
+  font: 800 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .12em;
+}
+
+.north-gate-seal.is-visible {
+  visibility: visible;
+  animation: north-gate-seal .9s ease-out forwards;
+}
+
+body.north-gate-check-focus #game-canvas {
+  filter: brightness(.96) saturate(.98) contrast(1.06);
+}
+
+@keyframes north-gate-seal {
+  0% { opacity: 0; transform: rotate(-11deg) scale(.72); }
+  28% { opacity: .96; transform: rotate(-11deg) scale(1.08); }
+  100% { opacity: 0; transform: rotate(-11deg) scale(.96); }
+}
+
+@media (max-width: 820px) {
+  .north-gate-check-panel {
+    left: 14px;
+    right: 14px;
+    bottom: 98px;
+    width: auto;
+    padding: 11px 12px;
+  }
+  .north-gate-seal {
+    right: 26px;
+    bottom: 76px;
+    width: 76px;
+    height: 76px;
+  }
+  .north-gate-check-title { font-size: 14px; }
+  .north-gate-check-grid { font-size: 11px; }
+}

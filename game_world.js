@@ -128,7 +128,7 @@ const DIALOGUES = {
   market: { speaker: "市場の商人", lines: ["おい、旅人。薬草束がひとつ消えた。", "犯人を決めつけると商売が壊れる。見たなら教えてくれ。"], choices: [{ text: "盗難騒ぎを記録する", done: ["market"], objective: "教会かギルドで身分確認を進める" }, { text: "路地裏の噂を聞く", objective: "怪しい路地裏で情報屋に接触する" }] },
   market_after: { speaker: "市場の商人", lines: ["さっきの騒ぎは落ち着いた。", "王都の市場では、正義感だけでは商売にならない。証拠と信用がいる。"] },
   training_gate: { speaker: "訓練場の衛兵", lines: ["魔法の試射か。街中でやられるよりは助かる。", "的は奥だ。教官の指示を聞け。"], choices: [{ text: "外門練習場へ入る", targetMap: "trainingGround", spawn: { x: 0, z: 48 }, objective: "訓練教官から火球制御を学ぶ" }] },
-  training: { speaker: "訓練教官", lines: ["街中で火球を撃つな。試すならここだ。", "的を見ろ。息を止めるな。恥ずかしい詠唱でも、出るなら使え。", "威力より、狙った場所で止めることを覚えろ。"], choices: [{ text: "火球を試射する", done: ["training"], effect: "fire", trust: { Guild: 2 }, objective: "翌日の模擬戦を受ける" }] },
+  training: { speaker: "訓練教官", lines: ["街中で火球を撃つな。試すならここだ。ここはギルド管理下の練習場——お前の一射は、全部査定簿に残る。", "的を見ろ。息を止めるな。恥ずかしい詠唱でも、出るなら使え。", "見ているのは威力じゃない。出した力を、狙った場所で止められるかだ。止められない力は、ただの危険物として記録される。"], choices: [{ text: "火球を試射する", done: ["training"], effect: "fire", trust: { Guild: 2 }, objective: "翌日の模擬戦を受ける" }] },
   training_after: { speaker: "訓練教官", lines: ["さっきよりは狙いがまともになった。", "模擬戦では威力ではなく、相手の動きを止める使い方をしろ。"] },
   mock_battle: { speaker: "試験官", lines: ["翌日。木剣を持った新人冒険者が前に出る。", "相手は速くない。だが、こちらが火球を外せば距離を詰められる。", "ユウジは小さな火球で足元を牽制し、相手の踏み込みを止めた。勝負あり。"], choices: [{ text: "模擬戦を終える", done: ["mock_battle"], trust: { Guild: 6 }, set: { "player.rank": "F級冒険者" }, targetMap: "plaza", spawn: { x: 135, z: -42 }, objective: "西の魔法学院を訪ね、入学相談をする" }] },
   mock_after: { speaker: "試験官", lines: ["模擬戦は終了だ。", "F級冒険者として、まずは王都内の小さな依頼から始めろ。", "それと——ギルドマスターが、お前を魔法学院に推すと言っていた。西の学院を訪ねてみろ。常識を学んでこい。"] },

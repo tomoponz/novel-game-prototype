@@ -845,6 +845,19 @@ function choose(c) { audio.play("ui_decide"); if (c.done) markDone(c.done); if (
 function markDone(ids) { ids.forEach((id) => { const q = state.quest.find((x) => x.id === id); if (q) q.done = true; }); }
 function addTrust(obj) { const t = state.player.trust || (state.player.trust = { Guild: 0, Church: 0, Crown: 0, Merchant: 0 }); let up = false; for (const k in obj) { if (obj[k] > 0) up = true; t[k] = (t[k] || 0) + obj[k]; } if (up) audio.play("trust_up"); }
 function setDeep(path, val) { const ks = path.split("."); let t = state; while (ks.length > 1) { const k = ks.shift(); t[k] ??= {}; t = t[k]; } t[ks[0]] = val; }
+// 進行許可/所持の単一の真実源。クエスト・契約・ランクから導出し、hotbar/debug/minimapが参照する。
+function syncPermits() {
+  const contract = String(state.player.contract || ""), rank = String(state.player.rank || "");
+  return (state.player.items = {
+    merchantLetter: done("merchant") || contract.includes("紹介状"),
+    guildApplication: done("guild_apply"),
+    manaTested: done("mana_test"),
+    provisionalRank: done("provisional") || rank.includes("F級"),
+    fRank: done("mock_battle") || rank.includes("F級冒険者"),
+    churchRecord: done("church_record") || contract.includes("確認書"),
+    academyRecommendation: done("academy") || contract.includes("学院")
+  });
+}
 function updateHud() {
   const mpText = `${Math.floor(state.player.mp)}/${state.player.maxMp}`;
   ui.stat.name.textContent = state.player.name;
@@ -865,16 +878,15 @@ function updateHud() {
   if (ui.banner.area) ui.banner.area.textContent = areaText;
   const minimaps = { plaza: "[北門]\n  |\n[市場]-[中央広場]-[職人区]\n  |      |\n[スラム]-[ギルド]-[訓練場]\n  |\n[教会]-[学院]-[貴族街]-[王城]", guildHall: "[受付]-[水晶]\n   |\n[ギルドマスター]\n   |\n[出口]", trainingGround: "[入口]-[的]-[模擬戦]", academy: "[書架]-[魔導具]\n   |\n[教師]-[学院生]\n   |\n[出口]", inn: "[客]-[女将]-[酔っ払い]\n   |\n[出口]", church: "[祭壇]\n  |\n[記録係]\n  |\n[出口]", forestRoad: "[森の街道]--[荷車]--[王都門]" };
   ui.map.textContent = minimaps[state.map] || data.maps?.[state.map]?.minimap || "[森の街道] -- [王都門]";
+  syncPermits();
   syncProgressHotbar();
   renderQuests();
 }
 function renderQuests() { ui.quests.innerHTML = ""; state.quest.forEach((q) => { const li = document.createElement("li"); li.textContent = q.text; if (q.done) li.classList.add("done"); ui.quests.appendChild(li); }); }
 function syncProgressHotbar() {
   if (!ui.hotbar) return;
-  const contract = String(state.player.contract || "");
-  const rank = String(state.player.rank || "");
-  const hasLetter = done("merchant") || contract.includes("紹介状");
-  const hasGuildStatus = done("guild_apply") || done("provisional") || rank.includes("F級");
+  const items = state.player.items || syncPermits();
+  const guildStatus = items.guildApplication || items.provisionalRank;
   const slot = (n, text, title) => {
     const el = ui.hotbar.querySelector(`.slot[data-slot="${n}"]`);
     const name = el?.querySelector(".slot-name");
@@ -882,8 +894,9 @@ function syncProgressHotbar() {
     name.textContent = text;
     el.title = title;
   };
-  slot(5, hasLetter ? "紹介状" : "紹介状?", hasLetter ? "商会の紹介状を所持" : "荷車襲撃の黒毛の噛み犬を火球で止めると入手");
-  slot(6, hasGuildStatus ? (done("provisional") || rank.includes("F級") ? "F仮登録" : "申請済") : "ギルド証?", hasGuildStatus ? `ギルド進行: ${rank || "登録申請済み"}` : "紹介状を持ってギルド受付へ");
+  slot(5, items.merchantLetter ? "紹介状" : "紹介状?", items.merchantLetter ? "商会の紹介状を所持" : "荷車襲撃の黒毛の噛み犬を火球で止めると入手");
+  slot(6, guildStatus ? (items.provisionalRank ? "F仮登録" : "申請済") : "ギルド証?", guildStatus ? `ギルド進行: ${state.player.rank || "登録申請済み"}` : "紹介状を持ってギルド受付へ");
+  slot(7, items.academyRecommendation ? "学院推薦" : items.fRank ? "F級証" : "携帯食", items.academyRecommendation ? "魔法学院の観察対象/推薦を取得" : items.fRank ? "F級冒険者として登録済み" : "携帯食（常備）");
 }
 function staminaText() { ui.stat.stamina.textContent = `${Math.round(state.player.stamina)}/${state.player.maxStamina}`; if (ui.vital.stamina) ui.vital.stamina.textContent = `${Math.round(state.player.stamina / state.player.maxStamina * 100)}%`; }
 function renderHearts() { if (!ui.hearts) return; const max = Math.max(1, Math.ceil((state.player.maxHp || 200) / 20)); const filled = Math.round((state.player.hp || 0) / 20); let html = ""; for (let i = 0; i < max; i++) html += `<span class="heart${i < filled ? "" : " empty"}">♥</span>`; ui.hearts.innerHTML = html; }
@@ -893,7 +906,7 @@ function closeMenu() { if (!state.menuOpen) return; state.menuOpen = false; ui.m
 function toggleMenu() { state.menuOpen ? closeMenu() : openMenu(); }
 function bindMenu() { ui.menuClose?.addEventListener("click", closeMenu); ui.menu?.addEventListener("click", (e) => { if (e.target === ui.menu) closeMenu(); }); }
 function bindAudioToggle() { if (!ui.audioToggle) return; ui.audioToggle.addEventListener("change", () => { audio.enable(); audio.setMuted(!ui.audioToggle.checked); }); }
-window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
+window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, items: () => syncPermits(), resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
 peek: () => ({ cam: camera.position.toArray().map((n) => +n.toFixed(1)), dir: (() => { const d = new THREE.Vector3(); camera.getWorldDirection(d); return d.toArray().map((n) => +n.toFixed(2)); })(), balls: projectiles.map((p) => { const ndc = p.ball.position.clone().project(camera); return { pos: p.ball.position.toArray().map((n) => +n.toFixed(1)), visible: p.ball.visible, inScene: !!p.ball.parent, emis: p.ball.material.emissiveIntensity, ndc: [+ndc.x.toFixed(2), +ndc.y.toFixed(2), +ndc.z.toFixed(2)] }; }) }) };
 // 公式ミニマップAPI(読み取り専用): next_destination.js はこれを優先利用し、cameraからの近似(approx)位置を使わない。
 window.__AURELIA_MINIMAP__ = () => ({
@@ -903,6 +916,7 @@ window.__AURELIA_MINIMAP__ = () => ({
   yaw: state.yaw,
   pitch: state.pitch,
   objective: data.objective || "",
+  items: state.player.items || {},
   active: state.active ? { id: state.active.id || null, name: state.active.name || null, dialogue: state.active.dialogue || null, targetMap: state.active.targetMap || state.active.map || null } : null
 });
 addEventListener("keydown", (e) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault(); if (state.inDialogue) { if (e.code === "ArrowDown") { moveChoice(1); return; } if (e.code === "ArrowUp") { moveChoice(-1); return; } if (e.code === "Escape") return closeDialogue(true); if (e.code === "Enter" || e.code === "Space") return advance(); return; } if (state.menuOpen) { if (e.code === "Escape") closeMenu(); return; } if (e.code === "Escape") { toggleMenu(); return; } if (e.code === "KeyF") state.cameraMode = state.cameraMode === "third" ? "first" : "third"; if (e.code === "Backquote" || e.code === "F3") { state.debug = !state.debug; updateHud(); } if (e.code === "KeyT") setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); if (e.code === "KeyE" && state.active) interact(); if (/^Digit[1-9]$/.test(e.code)) selectSlot(+e.code.slice(5)); state.keys.add(e.code); });

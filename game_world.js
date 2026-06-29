@@ -177,7 +177,7 @@ scene.add(player);
 
 const state = { started: false, loaded: false, map: null, keys: new Set(), yaw: 0, pitch: 0.08, cameraMode: "third", debug: params.has("debug"), player: { stamina: 100, maxStamina: 100, ...basePlayer, trust: { Guild: 0, Church: 0, Crown: 0, Merchant: 0 } }, quest: quests, active: null, inDialogue: false, dialogueId: null, lineIndex: 0, selected: 0, padButtons: [], fireCooldown: 0, burstCooldown: 0, isDashing: false, drag: false, lastX: 0, lastY: 0, shake: 0, hitStop: 0, timeOfDay: params.get("time") || "day", dayClock: 0, menuOpen: false, hotbarSlot: 1 };
 let bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 };
-let colliders = [], locations = [], npcs = [], movers = [], cullables = [], projectiles = [], bursts = [];
+let colliders = [], locations = [], npcs = [], movers = [], cullables = [], projectiles = [], bursts = [], mixers = [];
 let caravanThreat = null;
 let systemToastTimer = 0;
 let colliderGrid = new Map();
@@ -433,6 +433,7 @@ function loadMap(id, spawn) {
   cullables = [];
   projectiles = [];
   bursts = [];
+  mixers = [];
   caravanThreat = null;
   facadeSpecs = [];
   plainSpecs = [];
@@ -459,6 +460,9 @@ function loadCharacterModel(key, urls) {
   return modelCache.get(cacheKey).then((gltfs) => {
     const g = new THREE.Group();
     gltfs.forEach((gltf) => g.add(cloneSkeleton(gltf.scene)));
+    // 将来 idle 入りの GLB を差し替えた場合に備え、アニメclipがあれば保持(現状のCC0素体は0個)。
+    const clips = gltfs.flatMap((gltf) => gltf.animations || []);
+    if (clips.length) g.userData.clips = clips;
     return g;
   });
 }
@@ -608,6 +612,14 @@ function placeModelNpc(modelKey, fallbackVariant, x, z, color, name, dialogue, o
     n.remove(fallback);
     n.add(fitted);
     setModelStatus(n, modelKey, "loaded");
+    // 重要な固定NPCのみ: アニメclipがあれば idle を再生(現状の素体は0個なのでT字のまま=既知の制限)。
+    const clips = fitted.userData.clips;
+    if (clips && clips.length && !options.reservedModelSlot) {
+      const mixer = new THREE.AnimationMixer(fitted);
+      const idle = clips.find((c) => /idle|stand|breath/i.test(c.name)) || clips[0];
+      mixer.clipAction(idle).play();
+      mixers.push(mixer);
+    }
   }).catch(() => setModelStatus(n, modelKey, "fallback", "load-error"));
   return n;
 }
@@ -854,6 +866,7 @@ function updateEffects(dt) {
     }
   }
   for (let i = bursts.length - 1; i >= 0; i--) { const b = bursts[i]; b.life -= dt; b.g.scale.setScalar(1 + (1 - b.life / b.max) * 2); if (b.life <= 0) { world.remove(b.g); bursts.splice(i, 1); } }
+  for (const mx of mixers) mx.update(dt);
 }
 function burstAt(pos, color = 0xff7a1c) { const g = new THREE.Group(); g.position.copy(pos); world.add(g); for (let i = 0; i < 12; i++) add(new THREE.SphereGeometry(.07, 8, 6), mat(color, .32, color, 1.4), g); bursts.push({ g, life: .45, max: .45 }); state.shake = .18; }
 function loop() { let dt = Math.min(clock.getDelta(), .05); if (state.hitStop > 0) { state.hitStop -= dt; dt *= .2; } if (state.started && state.loaded) { if (!params.has("time")) { state.dayClock += dt; if (state.dayClock >= 180) { state.dayClock = 0; setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); } } controls(dt); recoverMagic(dt); updateMovers(dt); updateEffects(dt); updateTimeTransition(dt); detect(); updateCulling(); cameraUpdate(); } renderer.render(scene, camera); requestAnimationFrame(loop); }

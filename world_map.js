@@ -17,9 +17,10 @@
   const REGIONS = [
     // 中央 / 王都アウレリア
     { g: "central", name: "王都アウレリア中心区", manage: "王権/ギルド/教会/学院/商会", cond: "北門一時通行", needs: "商会紹介状 または 正式身分証", map: "plaza", spawn: { x: 0, z: 40 }, note: "4ブロック構想の対象(王都中心部のみ)。思想別地区ではなく段階拡張の制作単位", unlock: (c) => c.merchantLetter || c.done("gate") },
+    { g: "central", name: "行政通り / 許可局窓口", manage: "王都行政/記録官/衛兵", cond: "北門一時通行", needs: "用途別許可(王城区・港湾・辺境砦など)", map: "administrativeStreet", spawn: { x: 0, z: 54 }, note: "Phase 2の軽量サブマップ。行政機能の周囲に住宅・小商店・市民生活も混在", unlock: (c) => c.merchantLetter || c.done("gate") },
     { g: "central", name: "ギルド本部", manage: "冒険者ギルド", cond: "商会紹介状", needs: "商会紹介状", map: "guildHall", spawn: { x: 0, z: 4 }, unlock: (c) => c.merchantLetter },
     { g: "central", name: "魔法学院（キャンパス/講義棟）", manage: "王国学院局/学院教師", cond: "ギルド仮登録+魔力測定異常(実績到達)", needs: "学院観察対象", map: "academyCampus", spawn: { x: 0, z: 50 }, note: "王国内の一施設。独立地域ではない", unlock: (c) => c.fRank || c.academyObs },
-    { g: "central", name: "大聖堂記録区", manage: "教会", cond: "北門一時通行", needs: "身分照会(早期可)", map: "churchGrounds", spawn: { x: 0, z: 48 }, unlock: (c) => c.merchantLetter || c.done("gate") },
+    { g: "central", name: "大聖堂・記録所方面", manage: "教会", cond: "北門一時通行", needs: "身分照会(早期可)", map: "churchGrounds", spawn: { x: 0, z: 48 }, unlock: (c) => c.merchantLetter || c.done("gate") },
     { g: "central", name: "王城区", manage: "王権", cond: "王城区からの行動許可", needs: "Crown Record", map: null, note: "第5章で正式化", unlock: (c) => c.crownRecord },
     { g: "central", name: "市場区／商会事務所", manage: "商会連合", cond: "北門一時通行", needs: "なし(信用で取引拡大)", map: "merchantOffice", spawn: { x: 0, z: 7 }, note: "商会事務所(帳簿/倉庫/依頼)。倉庫・奥部屋は商会信用でゲート", unlock: (c) => c.done("gate") || c.merchantLetter },
     { g: "central", name: "住宅街/路地", manage: "王都自治/裏社会", cond: "北門一時通行", needs: "なし", map: "backstreet", spawn: { x: 0, z: 18 }, note: "裏路地の小区画(生活感)", unlock: (c) => c.done("gate") || c.merchantLetter },

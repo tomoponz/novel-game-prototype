@@ -10,7 +10,8 @@
     academyCampus: { minX: -68, maxX: 68, minZ: -92, maxZ: 66, label: "ACADEMY CAMPUS" },
     churchGrounds: { minX: -60, maxX: 60, minZ: -90, maxZ: 70, label: "CATHEDRAL" },
     inn: { minX: -11, maxX: 11, minZ: -9, maxZ: 9, label: "INN" },
-    backstreet: { minX: -22, maxX: 22, minZ: -30, maxZ: 22, label: "BACK STREET" }
+    backstreet: { minX: -22, maxX: 22, minZ: -30, maxZ: 22, label: "BACK STREET" },
+    merchantOffice: { minX: -14, maxX: 14, minZ: -11, maxZ: 10, label: "TRADE HOUSE" }
   };
 
   const MARKERS = {
@@ -28,7 +29,8 @@
     church: [{ x: 0, z: -2.5, label: "記録" }, { x: 0, z: 6.4, label: "出口" }],
     churchGrounds: [{ x: 0, z: -66, label: "大聖堂" }, { x: 0, z: -52, label: "記録所" }, { x: 0, z: 60, label: "正門" }],
     inn: [{ x: 0, z: -3.4, label: "女将" }, { x: 8.6, z: -3, label: "噂" }, { x: 0, z: 8.4, label: "出口" }],
-    backstreet: [{ x: 0, z: -10, label: "情報屋" }, { x: -4, z: -8, label: "井戸" }, { x: 0, z: 20, label: "出口" }]
+    backstreet: [{ x: 0, z: -10, label: "情報屋" }, { x: -4, z: -8, label: "井戸" }, { x: 0, z: 20, label: "出口" }],
+    merchantOffice: [{ x: 0, z: -3.6, label: "受付" }, { x: -9, z: -3.6, label: "帳簿" }, { x: 11.5, z: -7, label: "倉庫" }, { x: 0, z: 9.4, label: "出口" }]
   };
 
   const TARGET_RULES = [

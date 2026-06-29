@@ -35,6 +35,18 @@
       matches: (t) => ["academy_gate", "academy_teacher", "academy"].includes(t.dialogue || t.id),
       allow: (_t, s) => done(s, "mock_battle") || hasRank(s, "F級冒険者") || hasContract(s, "学院"),
       message: "王立魔法学院に入るには、ギルドでの推薦・実績が必要です。先に模擬戦まで進めてください。"
+    },
+    {
+      id: "merchant-warehouse-needs-trust",
+      matches: (t) => ["merchant_warehouse"].includes(t.dialogue || t.id),
+      allow: (_t, s) => trustAtLeast(s, "Merchant", 3),
+      message: "商会の倉庫に入るには、商会信用(Merchant Trust 3以上)が必要です。荷車の救助などで信用を積んでください。"
+    },
+    {
+      id: "merchant-backroom-needs-trust",
+      matches: (t) => ["merchant_backroom"].includes(t.dialogue || t.id),
+      allow: (_t, s) => trustAtLeast(s, "Merchant", 5),
+      message: "商会責任者室に入るには、より高い商会信用(Merchant Trust 5以上)が必要です。"
     }
   ];
 
@@ -45,6 +57,7 @@
   function done(s, id) { return !!s?.quest?.some((q) => q.id === id && q.done); }
   function hasContract(s, word) { return String(s?.player?.contract || "").includes(word); }
   function hasRank(s, word) { return String(s?.player?.rank || "").includes(word); }
+  function trustAtLeast(s, faction, n) { return Number(s?.player?.trust?.[faction] || 0) >= n; }
 
   function blockedMessage(target, s) {
     if (!target || !s) return "";

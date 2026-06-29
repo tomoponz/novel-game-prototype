@@ -205,3 +205,14 @@
 4. NPC/馬車のすり抜け改善
 5. アセット容量とCDN方針の整理
 
+---
+
+## 8. 進捗: open issues #10〜#17
+
+`feature/resolve-open-gameplay-issues-20260629` で #10〜#17 を前進。施設別マップ
+計画(項3)は `academyCampus` / `churchGrounds` として最初の遊べる版が入り、火球
+アクション(項1)・すり抜け改善(項4)も前進した。各Issueの完了/部分完了の一覧は
+`docs/world/city-layout-issues.md` の「Implemented / Partially implemented open
+issues」表を参照。T字ポーズ(項=#14)はMixer基盤のみ導入し、authored idle GLB
+待ちの部分対応とする。
+

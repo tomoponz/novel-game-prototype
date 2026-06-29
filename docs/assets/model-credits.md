@@ -66,3 +66,33 @@ Both sets keep the full rigged base body under the outfit (texture-stripped,
 material colors only). Known limitation: the bind pose is a static T-pose and the
 base body shows under the minimal outfit — a Blender-authored single GLB
 (A-pose, hidden parts removed) is the recommended next step.
+
+## T-pose handling (issue #14)
+
+Why the T-pose remains: the prepared runtime glTF parts contain geometry + a
+rigged skeleton but **zero animation clips** (verified — none of the
+`base/outfit/hair` files declare `animations`). The CC0 source packs ship the
+base characters and outfits without baked idle clips, and the texture-strip step
+does not synthesize any. With no clip to sample and an explicit rule against
+destructive bone edits, no safe per-frame pose can be applied to the current
+assets, so the fixed NPCs render in their bind (T) pose.
+
+What this PR does instead (safe, non-destructive):
+- `loadCharacterModel()` now preserves any `gltf.animations` on the cloned group
+  (`userData.clips`).
+- `placeModelNpc()` creates a `THREE.AnimationMixer` and plays an `idle`-like
+  clip **only for fixed/important NPCs** (not ambient crowd) **when clips exist**.
+  Today that path is a no-op because clip count is 0; it activates automatically
+  the moment an authored idle-pose GLB is dropped into the same runtime path.
+- The glTF fallback system (primitive on missing/invalid/under-budget) and
+  `SkeletonUtils.clone()` skinning fix are untouched; `?modelDebug=1` still works.
+
+To actually remove the T-pose, supply authored assets (either route works with no
+code change beyond the model path):
+1. A single Blender-authored GLB per character with hidden body parts removed and
+   a looping idle baked in, or
+2. An animation-bearing GLB whose clip name matches `/idle|stand|breath/i`.
+
+Priority NPCs for an authored idle pose: guild receptionist, guildmaster,
+academy teacher, inn Marta, priest, guard. Status: **partially done** — mixer
+infrastructure landed; visual T-pose remains until idle assets are provided.

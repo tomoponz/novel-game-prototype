@@ -137,7 +137,8 @@ const DIALOGUES = {
   blacksmith: { speaker: "鍛冶職人", lines: ["登録前の客に刃物は売れない。腕より先に信用を持ってこい。"] },
   inn: { speaker: "宿屋の女将", lines: ["部屋はあるよ。長逗留ならギルド証か教会の確認書を見せておくれ。"] },
   generic: { speaker: "通行人", lines: ["王都は広い。看板と鐘楼を目印にしな。"] },
-  academy_gate: { speaker: "学院門衛", lines: ["ここは王立魔法学院だ。学籍か推薦か、用件のある者だけが通れる。", "登録証は確認させてもらう。中では無断の詠唱は禁止だ。破れば退学より重い扱いになる。"], choices: [{ text: "学院に入る", targetMap: "academy", spawn: { x: 0, z: 6.6 }, objective: "魔法学院で教師に話を聞く" }] },
+  academy_gate: { speaker: "学院門衛", lines: ["ここは王立魔法学院だ。学籍か推薦か、用件のある者だけが通れる。", "登録証は確認させてもらう。中では無断の詠唱は禁止だ。破れば退学より重い扱いになる。"], choices: [{ text: "学院のキャンパスに入る", targetMap: "academyCampus", spawn: { x: 0, z: 50 }, objective: "学院のキャンパスを抜けて講義棟で教師に話を聞く" }] },
+  academy_campus: { speaker: "学院門衛", lines: ["王立魔法学院へようこそ。正面が講義棟、東に練習場、北東の塔は立入許可が要る。", "中庭は自由に通ってよい。ただし無断の詠唱は記録される。心得ておけ。"] },
   academy_teacher: { speaker: "魔法学院 教師", lines: ["……君が、測定で水晶にヒビを入れたという新人か。話は学院にも届いている。", "詠唱が学院の様式にない。『魔力弾』——短すぎる。普通は術式を言葉で組み上げるのに、君はほとんど省いている。", "才能は記録する。記録されない才能は、いずれ『危険』と呼ばれる。……どこで覚えた？"], choices: [{ text: "「気づいたら出ていました」と答える", done: ["academy"], trust: { Crown: 4 }, set: { "player.contract": "学院 観察対象" }, objective: "学費を稼ぎ、学院に通う足場を作る" }, { text: "推薦状について尋ねる", to: "academy_rec" }] },
   academy_rec: { speaker: "魔法学院 教師", lines: ["ギルドマスターの推薦があれば、聴講生として籍を置ける。だが学費は自分で稼げ。", "学院は才能を育てるが、施しはしない。記録と規則の中で、君がどう振る舞うかを見る。"], choices: [{ text: "理解した", done: ["academy"], trust: { Crown: 2 }, objective: "学費を稼ぎ、学院に通う足場を作る" }] },
   academy_teacher_after: { speaker: "魔法学院 教師", lines: ["君の詠唱は記録した。次は制御だ。学院の様式を学べば、その短さは『異常』ではなく『技術』になる。", "焦るな。ここでは、目立つ才能ほど早く管理される。"] },
@@ -176,7 +177,7 @@ scene.add(player);
 
 const state = { started: false, loaded: false, map: null, keys: new Set(), yaw: 0, pitch: 0.08, cameraMode: "third", debug: params.has("debug"), player: { stamina: 100, maxStamina: 100, ...basePlayer, trust: { Guild: 0, Church: 0, Crown: 0, Merchant: 0 } }, quest: quests, active: null, inDialogue: false, dialogueId: null, lineIndex: 0, selected: 0, padButtons: [], fireCooldown: 0, burstCooldown: 0, isDashing: false, drag: false, lastX: 0, lastY: 0, shake: 0, hitStop: 0, timeOfDay: params.get("time") || "day", dayClock: 0, menuOpen: false, hotbarSlot: 1 };
 let bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 };
-let colliders = [], locations = [], npcs = [], movers = [], cullables = [], projectiles = [], bursts = [];
+let colliders = [], locations = [], npcs = [], movers = [], cullables = [], projectiles = [], bursts = [], mixers = [];
 let caravanThreat = null;
 let systemToastTimer = 0;
 let colliderGrid = new Map();
@@ -255,7 +256,7 @@ function bindQualitySelect() {
 }
 function bindStartEarly() { const start = () => { if (state.started) return; audio.enable(); audio.play("ui_decide"); state.started = true; ui.title?.classList.add("is-hidden"); ui.loading?.classList.remove("is-hidden"); setTimeout(() => { const map = params.get("map") || data.startMap || "forestRoad"; loadMap(map, initialSpawn(map)); state.loaded = true; ui.loading?.classList.add("is-hidden"); }, 30); }; ui.start?.addEventListener("click", start); ui.start?.addEventListener("pointerup", (e) => { e.preventDefault(); start(); }); }
 function initLights() { hemiLight = new THREE.HemisphereLight(0xf0e6cf, 0x415063, 1.95); scene.add(hemiLight); sunLight = new THREE.DirectionalLight(0xfff1d6, 2.55); sunLight.position.set(90, 135, 70); sunLight.castShadow = quality.shadow; sunLight.shadow.mapSize.set(1536, 1536); sunLight.shadow.bias = -0.0004; Object.assign(sunLight.shadow.camera, { near: .5, far: 620, left: -390, right: 390, top: 390, bottom: -390 }); scene.add(sunLight); ambLight = new THREE.AmbientLight(0x556070, .5); scene.add(ambLight); }
-function isOutdoorMap() { return state.map === "plaza" || state.map === "forestRoad" || state.map === "trainingGround"; }
+function isOutdoorMap() { return state.map === "plaza" || state.map === "forestRoad" || state.map === "trainingGround" || state.map === "academyCampus" || state.map === "churchGrounds"; }
 function phaseSnapshot(phase) {
   const p = DAYPHASES[phase] || DAYPHASES.day;
   return { sky: new THREE.Color(p.sky), fogNear: p.fog[0], fogFar: p.fog[1], sun: p.sun, sunCol: new THREE.Color(p.sunCol), hemi: p.hemi, amb: p.amb, ambCol: new THREE.Color(p.ambCol) };
@@ -310,7 +311,7 @@ function updateTimeTransition(dt) {
   if (k >= 1) timeTransition = null;
 }
 function setTimeOfDay(phase, instant = false) { if (instant) { state.timeOfDay = phase; applyTimeOfDay(); updateHud(); } else transitionTimeOfDay(phase); }
-function initialSpawn(map) { return ({ forestRoad: { x: 0, z: 74 }, plaza: { x: 0, z: 610 }, guildHall: { x: 0, z: 6.2 }, church: { x: 0, z: 5.5 }, trainingGround: { x: 0, z: 48 }, academy: { x: 0, z: 9 }, inn: { x: 0, z: 5.4 } })[map] || { x: 0, z: 74 }; }
+function initialSpawn(map) { return ({ forestRoad: { x: 0, z: 74 }, plaza: { x: 0, z: 610 }, guildHall: { x: 0, z: 6.2 }, church: { x: 0, z: 5.5 }, churchGrounds: { x: 0, z: 48 }, trainingGround: { x: 0, z: 48 }, academy: { x: 0, z: 9 }, academyCampus: { x: 0, z: 50 }, inn: { x: 0, z: 5.4 } })[map] || { x: 0, z: 74 }; }
 function mat(color, rough = .82, em = 0x000000, pow = 0) { const k = `${color}:${rough}:${em}:${pow}`; if (!mats.has(k)) mats.set(k, new THREE.MeshStandardMaterial({ color, roughness: rough, emissive: em, emissiveIntensity: pow, flatShading: true })); return mats.get(k); }
 function add(geo, material, parent = world, cast = false, receive = true) { const m = new THREE.Mesh(geo, material); m.castShadow = Boolean(cast && quality.shadow); m.receiveShadow = receive; parent.add(m); return m; }
 function rand(a, b) { return a + Math.random() * (b - a); }
@@ -432,12 +433,13 @@ function loadMap(id, spawn) {
   cullables = [];
   projectiles = [];
   bursts = [];
+  mixers = [];
   caravanThreat = null;
   facadeSpecs = [];
   plainSpecs = [];
   shopAnchors = [];
   resetModelNpcBudget(id);
-  ({ forestRoad: buildForestRoad, plaza: buildCity, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround, academy: buildAcademy, inn: buildInn }[id] || buildForestRoad)();
+  ({ forestRoad: buildForestRoad, plaza: buildCity, guildHall: buildGuildHall, church: buildChurch, trainingGround: buildTrainingGround, academy: buildAcademy, academyCampus: buildAcademyCampus, churchGrounds: buildChurchGrounds, inn: buildInn }[id] || buildForestRoad)();
   locations.forEach(addMarker);
   applyTimeOfDay();
   player.position.set(spawn.x, spawn.y || 0, spawn.z);
@@ -458,6 +460,9 @@ function loadCharacterModel(key, urls) {
   return modelCache.get(cacheKey).then((gltfs) => {
     const g = new THREE.Group();
     gltfs.forEach((gltf) => g.add(cloneSkeleton(gltf.scene)));
+    // 将来 idle 入りの GLB を差し替えた場合に備え、アニメclipがあれば保持(現状のCC0素体は0個)。
+    const clips = gltfs.flatMap((gltf) => gltf.animations || []);
+    if (clips.length) g.userData.clips = clips;
     return g;
   });
 }
@@ -607,15 +612,67 @@ function placeModelNpc(modelKey, fallbackVariant, x, z, color, name, dialogue, o
     n.remove(fallback);
     n.add(fitted);
     setModelStatus(n, modelKey, "loaded");
+    // 重要な固定NPCのみ: アニメclipがあれば idle を再生(現状の素体は0個なのでT字のまま=既知の制限)。
+    const clips = fitted.userData.clips;
+    if (clips && clips.length && !options.reservedModelSlot) {
+      const mixer = new THREE.AnimationMixer(fitted);
+      const idle = clips.find((c) => /idle|stand|breath/i.test(c.name)) || clips[0];
+      mixer.clipAction(idle).play();
+      mixers.push(mixer);
+    }
   }).catch(() => setModelStatus(n, modelKey, "fallback", "load-error"));
   return n;
 }
 function buildForestRoad() { setEnv(0x6f91a1, 40, quality.fog); bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 }; ground(210, 290, 0x35513d); road(0, 0, 9, 260, 0x746756, "dirt"); for (let z = -120; z <= 120; z += 18) { road(-15, z, 20, 3, 0x665b4f, "dirt"); road(16, z + 8, 18, 2.8, 0x665b4f, "dirt"); } for (let i = 0; i < Math.floor(180 * quality.houses); i++) addTree((Math.random() < .5 ? -1 : 1) * rand(12, 86), rand(-128, 128), rand(.8, 1.4), true); for (let i = 0; i < Math.floor(60 * quality.props); i++) addRock(rand(-85, 85), rand(-125, 125), rand(.3, .8)); addGate(0, -112); addCaravan(6, 15); addSign(7, -90, "ROYAL CAPITAL"); locations.push({ id: "gate", name: "北門の検問を受ける", x: 0, z: -108, r: 6, dialogue: "north_gate" }, { id: "caravan", name: done("merchant") ? "救助済みの荷車を見る" : "荷車襲撃現場を見る", x: 6, z: 15, r: 6, dialogue: "caravan_attack" }); placeModelNpc("guard", "guard", 4, -98, 0xb77954, "北門衛兵", "north_gate", { map: "forestRoad" }); for (let i = 0; i < 4; i++) addNpc("guard", rand(-8, 8), rand(-70, 45), 0xb77954, "北門衛兵", "north_gate"); }
-function buildCity() { setEnv(0xbcd6e6, 130, 1500); bounds = { minX: -680, maxX: 680, minZ: -680, maxZ: 680 }; ground(1420, 1420, 0x6f8a52, "grass"); const floor = add(new THREE.PlaneGeometry(1330, 1330), surfaceMat("dirt", 90, 90), world, false, true); floor.rotation.x = -Math.PI / 2; floor.position.y = .012; cityWall(); road(0, 0, 24, 1240, 0x817767); road(0, 0, 1240, 24, 0x817767); for (const z of [-330, -130, 130, 330, 430]) road(0, z, 980, 9, 0x6f6657); for (const x of [-430, -330, -130, 130, 330, 430]) road(x, 0, 9, 980, 0x6f6657); minorAlleys(); castleHill(); centralPlaza(); guildDistrict(135, -70); churchDistrict(-185, -85); academyDistrict(-300, -60); marketDistrict(285, 85); craftDistrict(350, -125); nobleDistrict(-250, -350); slumDistrict(-410, 245); trainingDistrict(380, 330); gateDistrict(0, 610); shoppingStreet(); cityFill(); buildHouseBatch(facadeSpecs, true); buildHouseBatch(plainSpecs, false); traffic(); pedestrians(); props(); streetDressing(); addSign(0, 610, "NORTH GATE"); addSign(135, -38, "GUILD"); addSign(-185, -48, "CHURCH"); addSign(-300, -42, "ACADEMY"); addSign(285, 125, "MARKET"); addSign(-390, 235, "ALLEY"); locations.push({ id: "plaza", name: "中央広場を見渡す", x: 0, z: 40, r: 12, dialogue: "plaza" }, { id: "guild", name: "冒険者ギルドに入る", x: 135, z: -60, r: 10, dialogue: "guild" }, { id: "market", name: "市場の盗難騒ぎを見る", x: 260, z: 95, r: 13, dialogue: "market" }, { id: "church", name: "教会記録所で相談する", x: -185, z: -70, r: 12, dialogue: "church" }, { id: "training", name: "外門練習場へ行く", x: 360, z: 330, r: 13, dialogue: "training_gate" }, { id: "alley", name: "怪しい路地裏に入る", x: -390, z: 235, r: 12, dialogue: "alley" }, { id: "blacksmith", name: "鍛冶屋に近づく", x: 330, z: -110, r: 9, dialogue: "blacksmith" }); }
+function buildCity() { setEnv(0xbcd6e6, 130, 1500); bounds = { minX: -680, maxX: 680, minZ: -680, maxZ: 680 }; ground(1420, 1420, 0x6f8a52, "grass"); const floor = add(new THREE.PlaneGeometry(1330, 1330), surfaceMat("dirt", 90, 90), world, false, true); floor.rotation.x = -Math.PI / 2; floor.position.y = .012; cityWall(); road(0, 0, 24, 1240, 0x817767); road(0, 0, 1240, 24, 0x817767); for (const z of [-330, -130, 130, 330, 430]) road(0, z, 980, 9, 0x6f6657); for (const x of [-430, -330, -130, 130, 330, 430]) road(x, 0, 9, 980, 0x6f6657); minorAlleys(); castleHill(); centralPlaza(); guildDistrict(135, -70); churchDistrict(-185, -85); academyDistrict(-300, -60); marketDistrict(285, 85); craftDistrict(350, -125); nobleDistrict(-250, -350); slumDistrict(-410, 245); trainingDistrict(380, 330); gateDistrict(0, 610); shoppingStreet(); cityFill(); buildHouseBatch(facadeSpecs, true); buildHouseBatch(plainSpecs, false); traffic(); pedestrians(); props(); streetDressing(); addSign(0, 610, "NORTH GATE"); addSign(135, -38, "GUILD"); addSign(-185, -48, "CHURCH"); addSign(-300, -42, "ACADEMY"); addSign(285, 125, "MARKET"); addSign(-390, 235, "ALLEY"); addSign(15, 72, "北 ─ 北門・森の街道"); addSign(15, -72, "南 ─ 王城・貴族区(丘)"); addSign(72, 15, "東 ─ 市場・職人区"); addSign(-72, 15, "西 ─ 学院・教会区"); locations.push({ id: "plaza", name: "中央広場を見渡す", x: 0, z: 40, r: 12, dialogue: "plaza" }, { id: "guild", name: "冒険者ギルドに入る", x: 135, z: -60, r: 10, dialogue: "guild" }, { id: "market", name: "市場の盗難騒ぎを見る", x: 260, z: 95, r: 13, dialogue: "market" }, { id: "church", name: "大聖堂の敷地に入る", x: -185, z: -70, r: 12, targetMap: "churchGrounds", spawn: { x: 0, z: 44 } }, { id: "training", name: "外門練習場へ行く", x: 360, z: 330, r: 13, dialogue: "training_gate" }, { id: "alley", name: "怪しい路地裏に入る", x: -390, z: 235, r: 12, dialogue: "alley" }, { id: "blacksmith", name: "鍛冶屋に近づく", x: 330, z: -110, r: 9, dialogue: "blacksmith" }); }
 function buildGuildHall() { setEnv(0x1f1711, 12, 36); bounds = { minX: -8, maxX: 8, minZ: -7, maxZ: 7 }; ground(16, 15, 0x4c3727, "plank"); world.add(new THREE.HemisphereLight(0xffd6a0, 0x241a12, 1.9)); const torch = new THREE.PointLight(0xffb86a, 8, 22, 2); torch.position.set(0, 3.6, -2); world.add(torch); room(16, 15, 3.2, 0x3a281c); box(0, .55, -4.5, 6.4, 1.1, .9, 0x6b4a2f, "counter", world, true); box(0, 1.2, -6.2, 5.6, 2.4, .5, 0x5a3d27, "shelf", world, true); addQuestBoard(-5.6, -4.4); const crystal = add(new THREE.SphereGeometry(.45, 16, 10), mat(0x80d8ff, .2, 0x65cfff, .9), world, false, false); crystal.position.set(3.6, 1.15, -3.4); cull(crystal, 3.6, -3.4, 60); cyl(3.6, .55, -3.4, .32, .8, 0x62513a, "crystalBase", world, true); placeModelNpc("guildReceptionist", "receptionist", 0, -3.3, 0xd8b36b, "受付", "guild_reception", { map: "guildHall" }); placeModelNpc("guildmaster", "noble", -3.8, -3.4, 0x4f5d6f, "ギルドマスター", "guildmaster", { map: "guildHall" }); addNpc("adventurer", -3.8, .9, 0x8c6f4f, "冒険者", "generic"); locations.push({ id: "reception", name: "受付で登録申請をする", x: 0, z: -3.3, r: 3, dialogue: "guild_reception" }, { id: "crystal", name: "魔力測定水晶に触れる", x: 3.6, z: -3.4, r: 2.6, dialogue: "mana_measure" }, { id: "guildmaster", name: "ギルドマスターと話す", x: -3.8, z: -3.4, r: 2.8, dialogue: "guildmaster" }, { id: "guild_exit", name: "王都へ戻る", x: 0, z: 6.7, r: 2.4, targetMap: "plaza", spawn: { x: 135, z: -42 } }); }
-function buildChurch() { setEnv(0x151823, 12, 36); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x5b5a55, "stone"); world.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1d28, 1.7)); const glow = new THREE.PointLight(0xbfd4ff, 6, 20, 2); glow.position.set(0, 3.4, -3); world.add(glow); room(14, 14, 4, 0x44434a); box(0, .55, -4.4, 3.8, 1.05, 1.25, 0xddd1ae, "altar", world, true); for (let i = 0; i < 4; i++) { box(-2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); box(2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); } placeModelNpc("priest", "priest", 0, -2.5, 0xc9c4ad, "司祭", "church", { map: "church" }); }
+function buildChurch() { setEnv(0x151823, 12, 36); bounds = { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }; ground(14, 14, 0x5b5a55, "stone"); world.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1d28, 1.7)); const glow = new THREE.PointLight(0xbfd4ff, 6, 20, 2); glow.position.set(0, 3.4, -3); world.add(glow); room(14, 14, 4, 0x44434a); box(0, .55, -4.4, 3.8, 1.05, 1.25, 0xddd1ae, "altar", world, true); for (let i = 0; i < 4; i++) { box(-2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); box(2.6, .28, -1.2 + i * 1.45, 2.4, .35, .55, 0x5d4129, "bench"); } placeModelNpc("priest", "priest", 0, -2.5, 0xc9c4ad, "司祭", "church", { map: "church" }); locations.push({ id: "church_record_seat", name: "司祭に身分記録を相談する", x: 0, z: -2.5, r: 3, dialogue: "church" }, { id: "church_exit", name: "前庭へ戻る", x: 0, z: 6.4, r: 2.4, targetMap: "churchGrounds", spawn: { x: 0, z: -46 } }); }
+// 大聖堂前庭(別マップ): 大聖堂ファサード・双塔/尖塔・ステンドグラス調の窓・庭園・噴水・記録所(内部へ接続)・司祭/記録官/信徒。軽量。
+function buildChurchGrounds() {
+  setEnv(0xb6c4d2, 70, 1000); bounds = { minX: -60, maxX: 60, minZ: -90, maxZ: 66 };
+  ground(130, 170, 0x6f8a52, "grass"); road(0, -10, 12, 150, 0x8a8068);
+  house(0, -66, 44, 30, 26, 0x9a96a2, "CATHEDRAL", true, faceToward(0, 1));
+  for (const sx of [-26, 26]) { box(sx, 16, -64, 10, 34, 10, 0x8e8a98, "tower", world, true); const sp = add(coneGeo(7, 18, 4), mat(0x2f3541), world, true); sp.position.set(sx, 42, -64); sp.rotation.y = Math.PI / 4; cull(sp, sx, -64, 1200); }
+  { const cs = add(coneGeo(9, 26, 4), mat(0x33506a), world, true); cs.position.set(0, 43, -66); cs.rotation.y = Math.PI / 4; cull(cs, 0, -66, 1300); }
+  for (const [sx, col] of [[-12, 0xc0476a], [0, 0x4a86c0], [12, 0x5fae6a]]) { const w = add(boxGeo(3.4, 6, .3), mat(col, .3, col, .85), world); w.position.set(sx, 8, -50.6); cull(w, sx, -50, 900); }
+  fountain(0, -6, 3.4); for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) bench(Math.cos(a) * 11, -6 + Math.sin(a) * 11, a + Math.PI / 2);
+  for (let i = 0; i < 10; i++) addTree(rand(-50, 50), rand(2, 40), rand(1, 1.5), true);
+  for (let i = 0; i < 10; i++) flowerBox(rand(-42, 42), rand(-2, 38));
+  for (let z = -48; z <= 42; z += 18) { lamp(-8, z); lamp(8, z); } addSign(0, 54, "GRAND CATHEDRAL");
+  placeModelNpc("priest", "priest", -6, -40, 0xddd6c2, "司祭", "church", { map: "churchGrounds" });
+  addNpc("noble", 8, -38, 0xd8c89a, "記録官", "shop_records");
+  for (let i = 0; i < 6; i++) addNpc("faithful", rand(-30, 30), rand(-8, 30), 0xc9c4ad, "信徒", "church");
+  locations.push(
+    { id: "church_grounds_exit", name: "王都へ戻る", x: 0, z: 60, r: 5, targetMap: "plaza", spawn: { x: -185, z: -48 } },
+    { id: "church_office", name: "記録所に入る", x: 0, z: -52, r: 5, targetMap: "church", spawn: { x: 0, z: 5 } },
+    { id: "church_grounds_priest", name: "司祭に身分記録を相談する", x: -6, z: -38, r: 3, dialogue: "church" }
+  );
+}
 function buildTrainingGround() { setEnv(0x88a6b4, 25, 180); bounds = { minX: -60, maxX: 60, minZ: -70, maxZ: 70 }; ground(130, 150, 0x556c4c); road(0, 0, 18, 130, 0x776b5a); for (let i = 0; i < 16; i++) cyl(rand(-35, 35), .85, rand(-40, 40), .25, 1.7, 0x7a5635, "target"); addSign(0, 48, "TO CAPITAL"); placeModelNpc("guard", "guard", -8, 12, 0xb77954, "訓練教官", "training", { map: "trainingGround" }); addNpc("adventurer", 10, -8, 0x6f8aa6, "模擬戦相手", "mock_battle"); locations.push({ id: "practice", name: "火球制御を練習する", x: -8, z: 12, r: 4, dialogue: "training" }, { id: "mock", name: "翌日の模擬戦を受ける", x: 10, z: -8, r: 4, dialogue: "mock_battle" }, { id: "training_exit", name: "王都へ戻る", x: 0, z: 52, r: 4, targetMap: "plaza", spawn: { x: 360, z: 305 } }); }
-function buildAcademy() { setEnv(0x1a1c28, 12, 42); bounds = { minX: -9, maxX: 9, minZ: -8, maxZ: 8 }; ground(18, 16, 0x4a4640, "stone"); world.add(new THREE.HemisphereLight(0xcfd8f0, 0x20222e, 1.85)); const glow = new THREE.PointLight(0xbfd0ff, 7, 26, 2); glow.position.set(0, 4, -2); world.add(glow); room(18, 16, 3.8, 0x383a48); box(0, .6, -5.2, 6, 1.2, 1, 0x5a4a36, "lectern", world, true); for (let i = 0; i < 3; i++) { box(-7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); box(7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); } const orb = add(sphGeo(.5, 16, 12), mat(0x8fd2ff, .2, 0x6fb8ff, 1.0), world, false, false); orb.position.set(0, 2.3, -3.6); cull(orb, 0, -3.6, 70); cyl(0, .55, -3.6, .34, .8, 0x55607a, "orbBase", world, true); cyl(4.6, .9, 2.6, .3, 1.8, 0x7a5635, "target", world, true); for (let i = 0; i < 4; i++) box(-3 + i * 2, .35, 4.5, 1.6, .6, 1, 0x4a3a2a, "bench", world, true); placeModelNpc("academyTeacher", "teacher", 0, -3.7, 0x3a2e5a, "魔法学院 教師", "academy_teacher", { map: "academy" }); addNpc("student", -3.2, 1.4, 0x2e3a5c, "学院生", "academy_student"); addNpc("student", 3.4, .8, 0x2e3a5c, "学院生", "academy_student"); locations.push({ id: "academy_teacher", name: "教師と話す", x: 0, z: -3.7, r: 3, dialogue: "academy_teacher" }, { id: "academy_orb", name: "魔導具を調べる", x: 0, z: -3.6, r: 2.6, dialogue: "academy_orb" }, { id: "academy_exit", name: "王都へ戻る", x: 0, z: 7.2, r: 2.4, targetMap: "plaza", spawn: { x: -300, z: -88 } }); }
+function buildAcademy() { setEnv(0x1a1c28, 12, 42); bounds = { minX: -9, maxX: 9, minZ: -8, maxZ: 8 }; ground(18, 16, 0x4a4640, "stone"); world.add(new THREE.HemisphereLight(0xcfd8f0, 0x20222e, 1.85)); const glow = new THREE.PointLight(0xbfd0ff, 7, 26, 2); glow.position.set(0, 4, -2); world.add(glow); room(18, 16, 3.8, 0x383a48); box(0, .6, -5.2, 6, 1.2, 1, 0x5a4a36, "lectern", world, true); for (let i = 0; i < 3; i++) { box(-7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); box(7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); } const orb = add(sphGeo(.5, 16, 12), mat(0x8fd2ff, .2, 0x6fb8ff, 1.0), world, false, false); orb.position.set(0, 2.3, -3.6); cull(orb, 0, -3.6, 70); cyl(0, .55, -3.6, .34, .8, 0x55607a, "orbBase", world, true); cyl(4.6, .9, 2.6, .3, 1.8, 0x7a5635, "target", world, true); for (let i = 0; i < 4; i++) box(-3 + i * 2, .35, 4.5, 1.6, .6, 1, 0x4a3a2a, "bench", world, true); placeModelNpc("academyTeacher", "teacher", 0, -3.7, 0x3a2e5a, "魔法学院 教師", "academy_teacher", { map: "academy" }); addNpc("student", -3.2, 1.4, 0x2e3a5c, "学院生", "academy_student"); addNpc("student", 3.4, .8, 0x2e3a5c, "学院生", "academy_student"); locations.push({ id: "academy_teacher", name: "教師と話す", x: 0, z: -3.7, r: 3, dialogue: "academy_teacher" }, { id: "academy_orb", name: "魔導具を調べる", x: 0, z: -3.6, r: 2.6, dialogue: "academy_orb" }, { id: "academy_exit", name: "キャンパスへ戻る", x: 0, z: 7.2, r: 2.4, targetMap: "academyCampus", spawn: { x: 0, z: -46 } }); }
+// 魔法学院キャンパス(別マップ): 正門・中庭・講義棟(内部へ接続)・魔法塔・庭園・練習場・学生群。軽量プリミティブ。
+function buildAcademyCampus() {
+  setEnv(0xaecbe0, 70, 1000); bounds = { minX: -68, maxX: 68, minZ: -92, maxZ: 66 };
+  ground(150, 178, 0x6f8a52, "grass"); road(0, -14, 13, 150, 0x8a8068); road(0, 12, 92, 12, 0x8a8068);
+  for (const [bx, bz, bw, bd] of [[0, -90, 150, 4], [-68, -14, 4, 156], [68, -14, 4, 156]]) box(bx, 4.5, bz, bw, 9, bd, 0x8f93b4, "wall", world, true);
+  addGate(0, 60);
+  house(0, -66, 50, 26, 19, 0x8a8fb0, "LECTURE HALL", true, faceToward(0, 1));
+  box(42, 14, -52, 12, 28, 12, 0x9296b6, "tower", world, true); { const tr = add(coneGeo(9, 16, 6), mat(0x3a4a78), world, true); tr.position.set(42, 36, -52); cull(tr, 42, -52, 1200); }
+  house(-44, -44, 24, 18, 13, 0x847fae, "ANNEX", true, faceToward(1, 0));
+  fountain(0, 12, 3.2); for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) bench(Math.cos(a) * 9, 12 + Math.sin(a) * 9, a + Math.PI / 2);
+  for (let i = 0; i < 9; i++) addTree(rand(-62, -34), rand(-24, 36), rand(1, 1.6), true);
+  for (let i = 0; i < 8; i++) flowerBox(rand(-58, -36), rand(-18, 34));
+  box(46, .07, 24, 30, .14, 44, 0x746b56, "yard", world, true); for (let i = 0; i < 6; i++) cyl(40 + rand(-9, 9), 1, 22 + rand(-16, 16), .28, 2, 0x8a5d38, "target");
+  for (let z = -78; z <= 48; z += 22) { lamp(-9, z); lamp(9, z); } addSign(0, 54, "ROYAL ACADEMY");
+  for (let i = 0; i < 6; i++) addNpc("student", rand(-22, 24), rand(-28, 24), 0x2e3a5c, "学院生", "academy_student");
+  addNpc("teacher", -10, -44, 0x3a2e5a, "学院教師", "academy_teacher");
+  placeModelNpc("guard", "guard", 9, 40, 0xb77954, "学院門衛", "academy_campus", { map: "academyCampus" });
+  locations.push(
+    { id: "academy_campus_exit", name: "王都へ戻る", x: 0, z: 62, r: 5, targetMap: "plaza", spawn: { x: -300, z: -42 } },
+    { id: "academy_enter", name: "講義棟に入る", x: 0, z: -52, r: 5, targetMap: "academy", spawn: { x: 0, z: 7 } },
+    { id: "academy_campus_teacher", name: "学院教師と話す", x: -10, z: -42, r: 3, dialogue: "academy_teacher" }
+  );
+}
 function academyDistrict(x, z) { house(x, z, 40, 28, 20, 0x8a8fb0, "ACADEMY", true, faceToward(0, 1)); box(x + 23, 14, z - 2, 12, 28, 12, 0x9296b6, "academy", world, true); const tr = add(coneGeo(9, 17, 6), mat(0x3a4a78), world, true); tr.position.set(x + 23, 30.5, z - 2); cull(tr, x + 23, z, 1300); for (const s of [-1, 1]) { cyl(x + s * 11, 4, z + 16, .2, 8, 0x4a4632, "", world); box(x + s * 11, 5.4, z + 16, .3, 5, 2.4, 0x3a4a8c, "", world); } for (let i = 0; i < 5; i++) addNpc("student", x + rand(-17, 17), z + rand(19, 32), 0x2e3a5c, "学院生", "academy_student"); addNpc("teacher", x + 7, z + 16, 0x3a2e5a, "学院門衛", "academy_gate"); locations.push({ id: "academy", name: "魔法学院に入る", x: x, z: z + 16, r: 11, dialogue: "academy_gate" }); }
 const SHOP_T = { weapon: { name: "武器屋", wall: 0x6a5a4a, accent: 0x8a9098, keeper: "blacksmith", kname: "武器屋の主", dlg: "shop_weapon" }, armor: { name: "防具屋", wall: 0x5a6068, accent: 0xb6bcc6, keeper: "merchant", kname: "防具屋の主", dlg: "shop_armor" }, potion: { name: "薬屋", wall: 0x4a6a5a, accent: 0x6fcf8f, keeper: "merchant", kname: "薬師", dlg: "shop_potion" }, magicshop: { name: "魔法具店", wall: 0x4a4a6a, accent: 0x8fbfff, keeper: "teacher", kname: "魔法具商", dlg: "shop_magic" }, bakery: { name: "パン屋", wall: 0x8a6a44, accent: 0xe0b870, keeper: "merchant", kname: "パン屋", dlg: "shop_bakery" }, inn: { name: "宿屋 曲がった匙亭", wall: 0x7a5a3a, accent: 0xd8b36b, keeper: "merchant", kname: "女将マルタ", dlg: "inn_gate", enter: 1 }, tavern: { name: "酒場", wall: 0x6a4438, accent: 0xc8763a, keeper: "merchant", kname: "酒場の主", dlg: "shop_tavern" }, records: { name: "記録所", wall: 0x6a6458, accent: 0xd8c89a, keeper: "noble", kname: "記録官", dlg: "shop_records" } };
 function shopfront(x, z, angle, type) { const T = SHOP_T[type]; house(x, z, 16, 13, rand(8, 11), T.wall, T.name, true, angle); const fx = Math.sin(angle), fz = Math.cos(angle); const aw = box(x + fx * 6.6, 2.6, z + fz * 6.6, 4.4, .16, 1.6, T.accent, "", world); aw.rotation.y = angle; addNpc(T.keeper, x + fx * 7.4, z + fz * 7.4, T.wall, T.kname, T.dlg); shopAnchors.push([x, z, 13]); if (T.enter) locations.push({ id: T.dlg, name: T.name + "に入る", x: x + fx * 6.8, z: z + fz * 6.8, r: 5, dialogue: T.dlg }); }
@@ -662,7 +719,8 @@ function pedestrians() {
 function house(x, z, w, d, h, color, sign = null, important = false, angle = 0) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle; world.add(g); const sH = Math.min(1.1, h * .3), fz = d * .48; box(0, sH / 2, 0, w, sH, d, 0x6f6253, "", g); box(0, sH + (h - sH) / 2, 0, w * .96, h - sH, d * .96, color, "", g); box(0, sH + .95, fz + .07, 1.3, Math.min(1.9, h - sH - .3), .14, 0x2a1c12, "", g); for (const wx of [-w * .29, w * .29]) { box(wx, h - .78, fz + .02, .76, .78, .05, 0x2a1c12, "", g); const gl = add(boxGeo(.58, .6, .05), mat(0xffd486, .4, 0xffb74d, .82), g); gl.position.set(wx, h - .78, fz + .05); } const rh = Math.max(1.3, w * .36), a = Math.atan2(rh, w / 2), L = Math.hypot(w / 2, rh) * 1.05, rc = pick([0x6e2f28, 0x46342a, 0x32506c, 0x2e463a]); for (const s of [-1, 1]) { const pl = add(boxGeo(L, .22, d * 1.12), mat(rc), g, important); pl.position.set(s * w / 4, h + rh / 2, 0); pl.rotation.z = -s * a; } box(0, h + rh, 0, .2, .2, d * 1.14, 0x241a12, "", g); for (const s of [-1, 1]) { const gb = add(unitGable(), mat(color), g); gb.scale.set(w / 2, rh, 1); gb.position.set(0, h, s * fz); if (s < 0) gb.rotation.y = Math.PI; } if (important) { box(w * .32, h + rh * .55, -d * .22, .5, rh * 1.2, .5, 0x4a3a2c, "", g); for (const bx of [-w * .42, 0, w * .42]) box(bx, sH + (h - sH) / 2, fz + .02, .1, h - sH, .05, 0x3b2a1d, "", g); box(0, h - .12, fz + .02, w * .92, .14, .06, 0x3b2a1d, "", g); } if (sign) { box(0, h - .25, fz + .5, .5, .08, .5, 0x241a12, "", g); const lab = label(sign); lab.position.set(0, h - .8, fz + .6); lab.scale.set(1.7, .42, 1); g.add(lab); } const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, important ? "major" : "house"); cull(g, x, z, important ? 900 : 360); }
 function slumHouse(x, z, angle = 0) { const w = rand(5, 10), d = rand(5, 9), h = rand(3, 6); const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle + rand(-.08, .08); world.add(g); box(0, h / 2, 0, w, h, d, pick([0x4f4238, 0x5d4b39, 0x6d5237]), "", g); const roof = box(0, h + .45, 0, w * 1.1, .8, d * 1.05, pick([0x2d2520, 0x3b2a1e, 0x4d2f28]), "", g); roof.rotation.z = rand(-.08, .08); const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, "slumHouse"); cull(g, x, z, 340); }
 function stall(x, z, color) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = roadFacingAngle(x, z); world.add(g); box(0, .35, 0, 3, .7, 1.7, 0x6a4d35, "", g); box(0, 1.35, 0, 3.5, .14, 2.3, color, "", g); for (let i = 0; i < 4; i++) { const item = add(new THREE.DodecahedronGeometry(.16, 0), mat(pick([0xbf5545, 0xd8b36b, 0x5f9056, 0x8f6b3f])), g); item.position.set(rand(-1.1, 1.1), .85, rand(-.5, .5)); } const aabb = rotatedAabb(3.5, 2.3, g.rotation.y); addCollider(x, z, aabb.w, aabb.d, "stall"); cull(g, x, z, 340); }
-function addCaravan(x, z) { const g = cart(); g.position.set(x, 0, z); g.rotation.y = -.22; world.add(g); addNpc("merchant", x + .8, z + 1.4, 0x6f8aa6, "商人", done("merchant") ? "caravan_after" : "caravan_attack"); if (!done("merchant")) { const beast = createBeast(); const bx = x + 4.35, bz = z - .9; beast.position.set(bx, 0, bz); beast.rotation.y = -Math.PI / 2; world.add(beast); caravanThreat = { obj: beast, x: bx, z: bz, r: 1.15, active: true }; cull(beast, bx, bz, 420); } addCollider(x, z, 4.2, 3.4, "caravan"); cull(g, x, z, 500); }
+function addCaravan(x, z) { const g = cart(); g.position.set(x, 0, z); g.rotation.y = -.22; world.add(g); addNpc("merchant", x + .8, z + 1.4, 0x6f8aa6, "商人", done("merchant") ? "caravan_after" : "caravan_attack"); if (!done("merchant")) { const beast = createBeast(); const bx = x + 4.35, bz = z - .9; beast.position.set(bx, 0, bz); beast.rotation.y = -Math.PI / 2; world.add(beast); const marker = makeThreatMarker(); marker.position.set(bx, 0, bz); world.add(marker); caravanThreat = { obj: beast, marker, x: bx, z: bz, r: 1.4, active: true }; cull(beast, bx, bz, 420); cull(marker, bx, bz, 620); } addCollider(x, z, 4.2, 3.4, "caravan"); cull(g, x, z, 500); }
+function makeThreatMarker() { const g = new THREE.Group(); const ring = add(new THREE.TorusGeometry(1.35, .085, 8, 28), mat(0xff5a3a, .4, 0xff4a28, 1.5), g); ring.rotation.x = Math.PI / 2; ring.position.y = .12; g.userData.ring = ring; const beam = add(coneGeo(.46, 1, 5), mat(0xff7a4a, .35, 0xff5a2a, 1.8), g); beam.position.y = 2.05; beam.rotation.x = Math.PI; g.userData.beam = beam; const lab = label("⚠ TARGET"); lab.position.set(0, 2.95, 0); lab.scale.set(1.8, .48, 1); g.add(lab); return g; }
 function cart() { const g = new THREE.Group(); box(0, .55, 0, 2.8, .8, 1.6, 0x70482c, "", g); const h = createHorse(); h.position.set(0, 0, -1.55); g.add(h); for (const sx of [-1.3, 1.3]) for (const sz of [-.7, .7]) { const w = add(new THREE.TorusGeometry(.36, .07, 8, 18), mat(0x2c2018), g); w.position.set(sx, .35, sz); w.rotation.y = Math.PI / 2; } return g; }
 function createHorse() { const g = new THREE.Group(); box(0, .78, 0, 1.15, .55, .38, 0x5b3a28, "", g); const neck = box(.5, 1.05, 0, .25, .55, .22, 0x5b3a28, "", g); neck.rotation.z = -.35; box(.75, 1.25, 0, .35, .25, .25, 0x5b3a28, "", g); for (const x of [-.38, .38]) for (const z of [-.14, .14]) box(x, .34, z, .12, .65, .12, 0x3b281d, "", g); return g; }
 function createBeast() { const g = new THREE.Group(); box(0, .62, 0, .95, .42, .36, 0x111015, "", g); box(-.58, .72, 0, .36, .28, .32, 0x09090d, "", g); box(-.76, .61, 0, .22, .1, .28, 0x3a0c0c, "", g); return g; }
@@ -718,20 +776,25 @@ function updateMovers(dt) {
     const vx = dx / dist, vz = dz / dist, step = m.speed * dt, r = (m.r || .7) * .74;
     const nx = m.obj.position.x + vx * step, nz = m.obj.position.z + vz * step;
     if (!state.debug && blockedStatic(nx, nz, r)) {
+      m.stuck = (m.stuck || 0) + 1;
       const side = m.avoidTurn || (Math.random() < .5 ? -1 : 1);
       m.avoidTurn = side;
       const sx = -vz * side, sz = vx * side, ax = m.obj.position.x + sx * step * .65, az = m.obj.position.z + sz * step * .65;
-      if (!blockedStatic(ax, az, r)) {
+      // 横回避が通れば滑らせる。ただし長く詰まり続けたら(grind防止)経路を進めて再ルート。
+      if (m.stuck < 14 && !blockedStatic(ax, az, r)) {
         m.obj.position.x = ax;
         m.obj.position.z = az;
         m.obj.rotation.y = Math.atan2(sx, sz);
       } else {
         m.index = (m.index + 1) % m.path.length;
         m.wait = m.type === "cart" ? rand(.35, .9) : rand(.2, .8);
+        m.avoidTurn = 0;
+        m.stuck = 0;
       }
       continue;
     }
     m.avoidTurn = 0;
+    m.stuck = 0;
     m.obj.position.x = nx;
     m.obj.position.z = nz;
     m.obj.rotation.y = Math.atan2(vx, vz);
@@ -770,6 +833,10 @@ function resolveCaravanRescue() {
     caravanThreat.obj.visible = false;
     world.remove(caravanThreat.obj);
   }
+  if (caravanThreat?.marker) {
+    caravanThreat.marker.visible = false;
+    world.remove(caravanThreat.marker);
+  }
   caravanThreat = null;
   const spot = locations.find((l) => l.id === "caravan");
   if (spot) spot.name = "救助済みの荷車を見る";
@@ -780,6 +847,7 @@ function updateEffects(dt) {
   state.fireCooldown = Math.max(0, state.fireCooldown - dt);
   state.burstCooldown = Math.max(0, state.burstCooldown - dt);
   state.shake = Math.max(0, state.shake - dt * 3);
+  if (caravanThreat?.active && caravanThreat.marker) { const t = clock.elapsedTime, pulse = 1 + Math.sin(t * 4.2) * .15; const mk = caravanThreat.marker; if (mk.userData.ring) mk.userData.ring.scale.set(pulse, pulse, 1); if (mk.userData.beam) mk.userData.beam.position.y = 2.05 + Math.sin(t * 3) * .14; }
   if (ui.cooldowns.fire) ui.cooldowns.fire.value = state.fireCooldown ? 1 - state.fireCooldown / .32 : 1;
   if (ui.cooldowns.burst) ui.cooldowns.burst.value = state.burstCooldown ? 1 - state.burstCooldown / .95 : 1;
   for (let i = projectiles.length - 1; i >= 0; i--) {
@@ -798,6 +866,7 @@ function updateEffects(dt) {
     }
   }
   for (let i = bursts.length - 1; i >= 0; i--) { const b = bursts[i]; b.life -= dt; b.g.scale.setScalar(1 + (1 - b.life / b.max) * 2); if (b.life <= 0) { world.remove(b.g); bursts.splice(i, 1); } }
+  for (const mx of mixers) mx.update(dt);
 }
 function burstAt(pos, color = 0xff7a1c) { const g = new THREE.Group(); g.position.copy(pos); world.add(g); for (let i = 0; i < 12; i++) add(new THREE.SphereGeometry(.07, 8, 6), mat(color, .32, color, 1.4), g); bursts.push({ g, life: .45, max: .45 }); state.shake = .18; }
 function loop() { let dt = Math.min(clock.getDelta(), .05); if (state.hitStop > 0) { state.hitStop -= dt; dt *= .2; } if (state.started && state.loaded) { if (!params.has("time")) { state.dayClock += dt; if (state.dayClock >= 180) { state.dayClock = 0; setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); } } controls(dt); recoverMagic(dt); updateMovers(dt); updateEffects(dt); updateTimeTransition(dt); detect(); updateCulling(); cameraUpdate(); } renderer.render(scene, camera); requestAnimationFrame(loop); }
@@ -810,7 +879,7 @@ function gamepad() { const ps = navigator.getGamepads ? [...navigator.getGamepad
 function dead(v) { return Math.abs(v) < .16 ? 0 : v; }
 function handlePad() { const p = gamepad(); if (!p) return; const now = p.buttons.map((b) => b.pressed); const down = (i) => now[i] && !state.padButtons[i]; if (state.inDialogue) { const y = dead(p.axes[1] || 0); if (down(13) || y > .65) moveChoice(1); if (down(12) || y < -.65) moveChoice(-1); if (down(0)) advance(); if (down(1)) closeDialogue(true); state.padButtons = now; return; } if (down(0) && state.active) interact(); if (down(1)) dodge(); if (down(2)) castFireball("fire"); if (down(3)) castFireball("burst"); if (down(9) || down(11)) state.cameraMode = state.cameraMode === "third" ? "first" : "third"; state.padButtons = now; }
 function detect() { let near = null, dist = Infinity; for (const n of npcs) { if (n.visible === false) continue; const d = player.position.distanceTo(n.position); if (d < dist) { dist = d; near = n.userData; } } for (const l of locations) { const d = Math.hypot(player.position.x - l.x, player.position.z - l.z); if (d < dist) { dist = d; near = l; } } if (near && dist < (near.r || 2.5) && !state.inDialogue) { state.active = near; ui.hintText.textContent = near.name || "調べる"; ui.hint.classList.remove("is-hidden"); } else { state.active = null; ui.hint.classList.add("is-hidden"); } }
-function cameraUpdate() { const target = new THREE.Vector3(player.position.x, player.position.y + 1.08, player.position.z); if (state.cameraMode === "first") { const eye = new THREE.Vector3(player.position.x, player.position.y + 1.55, player.position.z); const look = new THREE.Vector3(-Math.sin(state.yaw) * Math.cos(state.pitch), Math.sin(state.pitch), -Math.cos(state.yaw) * Math.cos(state.pitch)); camera.position.lerp(eye, .45); if (state.shake > 0) camera.position.add(new THREE.Vector3(rand(-.035, .035), rand(-.025, .025), 0)); camera.lookAt(eye.clone().add(look)); player.visible = false; return; } player.visible = true; const radius = state.map === "plaza" ? 18 : 8.8, base = state.map === "plaza" ? 10 : 5.8; const off = new THREE.Vector3(Math.sin(state.yaw) * radius, base + Math.sin(state.pitch) * 7, Math.cos(state.yaw) * radius); camera.position.lerp(target.clone().add(off), .12); if (state.shake > 0) camera.position.add(new THREE.Vector3(rand(-.08, .08), rand(-.04, .04), rand(-.08, .08))); camera.lookAt(target); }
+function cameraUpdate() { const target = new THREE.Vector3(player.position.x, player.position.y + 1.08, player.position.z); if (state.cameraMode === "first") { const eye = new THREE.Vector3(player.position.x, player.position.y + 1.55, player.position.z); const look = new THREE.Vector3(-Math.sin(state.yaw) * Math.cos(state.pitch), Math.sin(state.pitch), -Math.cos(state.yaw) * Math.cos(state.pitch)); camera.position.lerp(eye, .45); if (state.shake > 0) camera.position.add(new THREE.Vector3(rand(-.035, .035), rand(-.025, .025), 0)); camera.lookAt(eye.clone().add(look)); player.visible = false; return; } player.visible = true; const big = state.map === "plaza", campus = state.map === "academyCampus" || state.map === "churchGrounds"; const radius = big ? 18 : campus ? 13 : 8.8, base = big ? 10 : campus ? 8 : 5.8; const off = new THREE.Vector3(Math.sin(state.yaw) * radius, base + Math.sin(state.pitch) * 7, Math.cos(state.yaw) * radius); camera.position.lerp(target.clone().add(off), .12); if (state.shake > 0) camera.position.add(new THREE.Vector3(rand(-.08, .08), rand(-.04, .04), rand(-.08, .08))); camera.lookAt(target); }
 // 進行テーブル: 基準会話ID -> { q: 完了判定クエスト, after: 完了後の会話, mid?: 途中会話, midUntil?: midを抜ける条件クエスト }
 // 同じイベントを二度発生させず、完了後は自動で「後日談」会話へ切り替える単一の真実源。
 const PROGRESS = {
@@ -839,6 +908,19 @@ function choose(c) { audio.play("ui_decide"); if (c.done) markDone(c.done); if (
 function markDone(ids) { ids.forEach((id) => { const q = state.quest.find((x) => x.id === id); if (q) q.done = true; }); }
 function addTrust(obj) { const t = state.player.trust || (state.player.trust = { Guild: 0, Church: 0, Crown: 0, Merchant: 0 }); let up = false; for (const k in obj) { if (obj[k] > 0) up = true; t[k] = (t[k] || 0) + obj[k]; } if (up) audio.play("trust_up"); }
 function setDeep(path, val) { const ks = path.split("."); let t = state; while (ks.length > 1) { const k = ks.shift(); t[k] ??= {}; t = t[k]; } t[ks[0]] = val; }
+// 進行許可/所持の単一の真実源。クエスト・契約・ランクから導出し、hotbar/debug/minimapが参照する。
+function syncPermits() {
+  const contract = String(state.player.contract || ""), rank = String(state.player.rank || "");
+  return (state.player.items = {
+    merchantLetter: done("merchant") || contract.includes("紹介状"),
+    guildApplication: done("guild_apply"),
+    manaTested: done("mana_test"),
+    provisionalRank: done("provisional") || rank.includes("F級"),
+    fRank: done("mock_battle") || rank.includes("F級冒険者"),
+    churchRecord: done("church_record") || contract.includes("確認書"),
+    academyRecommendation: done("academy") || contract.includes("学院")
+  });
+}
 function updateHud() {
   const mpText = `${Math.floor(state.player.mp)}/${state.player.maxMp}`;
   ui.stat.name.textContent = state.player.name;
@@ -853,22 +935,21 @@ function updateHud() {
   const objText = (state.debug ? "[DEBUG FLY] " : "") + (data.objective || "ギルドへ向かう");
   ui.objective.textContent = objText;
   if (ui.banner.objective) ui.banner.objective.textContent = objText;
-  const areaNames = { plaza: "王都アウレリア城下町", guildHall: "冒険者ギルド内部", trainingGround: "外門練習場", academy: "王立魔法学院", church: "教会記録所", inn: "宿屋 曲がった匙亭", forestRoad: "王都へ続く森の街道" };
+  const areaNames = { plaza: "王都アウレリア城下町", guildHall: "冒険者ギルド内部", trainingGround: "外門練習場", academy: "王立魔法学院 講義棟", academyCampus: "王立魔法学院 キャンパス", church: "教会記録所", churchGrounds: "大聖堂 前庭", inn: "宿屋 曲がった匙亭", forestRoad: "王都へ続く森の街道" };
   const areaText = (areaNames[state.map] || data.maps?.[state.map]?.name || "王都へ続く森の街道") + (DAYPHASES[state.timeOfDay] ? "　・　" + DAYPHASES[state.timeOfDay].label : "");
   ui.area.textContent = areaText;
   if (ui.banner.area) ui.banner.area.textContent = areaText;
-  const minimaps = { plaza: "[北門]\n  |\n[市場]-[中央広場]-[職人区]\n  |      |\n[スラム]-[ギルド]-[訓練場]\n  |\n[教会]-[学院]-[貴族街]-[王城]", guildHall: "[受付]-[水晶]\n   |\n[ギルドマスター]\n   |\n[出口]", trainingGround: "[入口]-[的]-[模擬戦]", academy: "[書架]-[魔導具]\n   |\n[教師]-[学院生]\n   |\n[出口]", inn: "[客]-[女将]-[酔っ払い]\n   |\n[出口]", church: "[祭壇]\n  |\n[記録係]\n  |\n[出口]", forestRoad: "[森の街道]--[荷車]--[王都門]" };
+  const minimaps = { plaza: "[北門]\n  |\n[市場]-[中央広場]-[職人区]\n  |      |\n[スラム]-[ギルド]-[訓練場]\n  |\n[教会]-[学院]-[貴族街]-[王城]", guildHall: "[受付]-[水晶]\n   |\n[ギルドマスター]\n   |\n[出口]", trainingGround: "[入口]-[的]-[模擬戦]", academy: "[書架]-[魔導具]\n   |\n[教師]-[学院生]\n   |\n[出口→キャンパス]", academyCampus: "[講義棟]-[塔]\n   |\n[中庭/噴水]-[練習場]\n   |\n[正門→王都]", inn: "[客]-[女将]-[酔っ払い]\n   |\n[出口]", church: "[祭壇]\n  |\n[記録係]\n  |\n[出口→前庭]", churchGrounds: "[大聖堂]-[尖塔]\n   |\n[記録所]-[庭園/噴水]\n   |\n[正門→王都]", forestRoad: "[森の街道]--[荷車]--[王都門]" };
   ui.map.textContent = minimaps[state.map] || data.maps?.[state.map]?.minimap || "[森の街道] -- [王都門]";
+  syncPermits();
   syncProgressHotbar();
   renderQuests();
 }
 function renderQuests() { ui.quests.innerHTML = ""; state.quest.forEach((q) => { const li = document.createElement("li"); li.textContent = q.text; if (q.done) li.classList.add("done"); ui.quests.appendChild(li); }); }
 function syncProgressHotbar() {
   if (!ui.hotbar) return;
-  const contract = String(state.player.contract || "");
-  const rank = String(state.player.rank || "");
-  const hasLetter = done("merchant") || contract.includes("紹介状");
-  const hasGuildStatus = done("guild_apply") || done("provisional") || rank.includes("F級");
+  const items = state.player.items || syncPermits();
+  const guildStatus = items.guildApplication || items.provisionalRank;
   const slot = (n, text, title) => {
     const el = ui.hotbar.querySelector(`.slot[data-slot="${n}"]`);
     const name = el?.querySelector(".slot-name");
@@ -876,8 +957,9 @@ function syncProgressHotbar() {
     name.textContent = text;
     el.title = title;
   };
-  slot(5, hasLetter ? "紹介状" : "紹介状?", hasLetter ? "商会の紹介状を所持" : "荷車襲撃の黒毛の噛み犬を火球で止めると入手");
-  slot(6, hasGuildStatus ? (done("provisional") || rank.includes("F級") ? "F仮登録" : "申請済") : "ギルド証?", hasGuildStatus ? `ギルド進行: ${rank || "登録申請済み"}` : "紹介状を持ってギルド受付へ");
+  slot(5, items.merchantLetter ? "紹介状" : "紹介状?", items.merchantLetter ? "商会の紹介状を所持" : "荷車襲撃の黒毛の噛み犬を火球で止めると入手");
+  slot(6, guildStatus ? (items.provisionalRank ? "F仮登録" : "申請済") : "ギルド証?", guildStatus ? `ギルド進行: ${state.player.rank || "登録申請済み"}` : "紹介状を持ってギルド受付へ");
+  slot(7, items.academyRecommendation ? "学院推薦" : items.fRank ? "F級証" : "携帯食", items.academyRecommendation ? "魔法学院の観察対象/推薦を取得" : items.fRank ? "F級冒険者として登録済み" : "携帯食（常備）");
 }
 function staminaText() { ui.stat.stamina.textContent = `${Math.round(state.player.stamina)}/${state.player.maxStamina}`; if (ui.vital.stamina) ui.vital.stamina.textContent = `${Math.round(state.player.stamina / state.player.maxStamina * 100)}%`; }
 function renderHearts() { if (!ui.hearts) return; const max = Math.max(1, Math.ceil((state.player.maxHp || 200) / 20)); const filled = Math.round((state.player.hp || 0) / 20); let html = ""; for (let i = 0; i < max; i++) html += `<span class="heart${i < filled ? "" : " empty"}">♥</span>`; ui.hearts.innerHTML = html; }
@@ -887,8 +969,19 @@ function closeMenu() { if (!state.menuOpen) return; state.menuOpen = false; ui.m
 function toggleMenu() { state.menuOpen ? closeMenu() : openMenu(); }
 function bindMenu() { ui.menuClose?.addEventListener("click", closeMenu); ui.menu?.addEventListener("click", (e) => { if (e.target === ui.menu) closeMenu(); }); }
 function bindAudioToggle() { if (!ui.audioToggle) return; ui.audioToggle.addEventListener("change", () => { audio.enable(); audio.setMuted(!ui.audioToggle.checked); }); }
-window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
+window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, items: () => syncPermits(), movers: () => ({ total: movers.length, byType: movers.reduce((a, m) => (a[m.type] = (a[m.type] || 0) + 1, a), {}), stuck: movers.filter((m) => (m.stuck || 0) > 6).length, sample: movers.slice(0, 8).map((m) => ({ type: m.type, x: +m.obj.position.x.toFixed(1), z: +m.obj.position.z.toFixed(1), idx: m.index, stuck: m.stuck || 0, wait: +(m.wait || 0).toFixed(2), visible: m.obj.visible !== false })) }), resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
 peek: () => ({ cam: camera.position.toArray().map((n) => +n.toFixed(1)), dir: (() => { const d = new THREE.Vector3(); camera.getWorldDirection(d); return d.toArray().map((n) => +n.toFixed(2)); })(), balls: projectiles.map((p) => { const ndc = p.ball.position.clone().project(camera); return { pos: p.ball.position.toArray().map((n) => +n.toFixed(1)), visible: p.ball.visible, inScene: !!p.ball.parent, emis: p.ball.material.emissiveIntensity, ndc: [+ndc.x.toFixed(2), +ndc.y.toFixed(2), +ndc.z.toFixed(2)] }; }) }) };
+// 公式ミニマップAPI(読み取り専用): next_destination.js はこれを優先利用し、cameraからの近似(approx)位置を使わない。
+window.__AURELIA_MINIMAP__ = () => ({
+  map: state.map,
+  x: player.position.x,
+  z: player.position.z,
+  yaw: state.yaw,
+  pitch: state.pitch,
+  objective: data.objective || "",
+  items: state.player.items || {},
+  active: state.active ? { id: state.active.id || null, name: state.active.name || null, dialogue: state.active.dialogue || null, targetMap: state.active.targetMap || state.active.map || null } : null
+});
 addEventListener("keydown", (e) => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault(); if (state.inDialogue) { if (e.code === "ArrowDown") { moveChoice(1); return; } if (e.code === "ArrowUp") { moveChoice(-1); return; } if (e.code === "Escape") return closeDialogue(true); if (e.code === "Enter" || e.code === "Space") return advance(); return; } if (state.menuOpen) { if (e.code === "Escape") closeMenu(); return; } if (e.code === "Escape") { toggleMenu(); return; } if (e.code === "KeyF") state.cameraMode = state.cameraMode === "third" ? "first" : "third"; if (e.code === "Backquote" || e.code === "F3") { state.debug = !state.debug; updateHud(); } if (e.code === "KeyT") setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); if (e.code === "KeyE" && state.active) interact(); if (/^Digit[1-9]$/.test(e.code)) selectSlot(+e.code.slice(5)); state.keys.add(e.code); });
 addEventListener("keyup", (e) => state.keys.delete(e.code));
 ui.canvas.addEventListener("pointerdown", (e) => { state.drag = true; state.lastX = e.clientX; state.lastY = e.clientY; });

@@ -12,7 +12,8 @@
     inn: { minX: -11, maxX: 11, minZ: -9, maxZ: 9, label: "INN" },
     backstreet: { minX: -22, maxX: 22, minZ: -30, maxZ: 22, label: "BACK STREET" },
     merchantOffice: { minX: -14, maxX: 14, minZ: -11, maxZ: 10, label: "TRADE HOUSE" },
-    administrativeStreet: { minX: -64, maxX: 64, minZ: -88, maxZ: 64, label: "ADMIN STREET" }
+    administrativeStreet: { minX: -64, maxX: 64, minZ: -88, maxZ: 64, label: "ADMIN STREET" },
+    marketLodgingStreet: { minX: -72, maxX: 72, minZ: -88, maxZ: 66, label: "MARKET LODGING" }
   };
 
   const MARKERS = {
@@ -22,7 +23,7 @@
       { x: -185, z: -85, label: "教会" }, { x: -300, z: -60, label: "学院" },
       { x: 380, z: 330, label: "訓練" }, { x: 0, z: -620, label: "王城" },
       { x: 78, z: -92, label: "案内板" }, { x: 0, z: 82, label: "周辺街路" },
-      { x: -34, z: -78, label: "行政通り" }
+      { x: -34, z: -78, label: "行政通り" }, { x: 78, z: -34, label: "市場宿屋" }
     ],
     forestRoad: [{ x: 6, z: 15, label: "荷車" }, { x: 0, z: -108, label: "北門" }],
     guildHall: [{ x: 0, z: -3.3, label: "受付" }, { x: 3.6, z: -3.4, label: "水晶" }, { x: 0, z: 6.7, label: "出口" }],
@@ -34,7 +35,8 @@
     inn: [{ x: 0, z: -3.4, label: "女将" }, { x: 8.6, z: -3, label: "噂" }, { x: 0, z: 8.4, label: "出口" }],
     backstreet: [{ x: 0, z: -10, label: "情報屋" }, { x: -4, z: -8, label: "井戸" }, { x: 0, z: 20, label: "出口" }],
     merchantOffice: [{ x: 0, z: -3.6, label: "受付" }, { x: -9, z: -3.6, label: "帳簿" }, { x: 11.5, z: -7, label: "倉庫" }, { x: 0, z: 9.4, label: "出口" }],
-    administrativeStreet: [{ x: -18, z: -35, label: "許可局" }, { x: 18, z: -34, label: "記録官" }, { x: -42, z: 2, label: "警備詰所" }, { x: 0, z: -72, label: "王城区方面" }, { x: 0, z: 58, label: "出口" }]
+    administrativeStreet: [{ x: -18, z: -35, label: "許可局" }, { x: 18, z: -34, label: "記録官" }, { x: -42, z: 2, label: "警備詰所" }, { x: 0, z: -72, label: "王城区方面" }, { x: 0, z: 58, label: "出口" }],
+    marketLodgingStreet: [{ x: -30, z: -30, label: "宿屋" }, { x: 30, z: -30, label: "商会" }, { x: 0, z: 26, label: "掲示板" }, { x: -50, z: 31, label: "裏路地" }, { x: 0, z: 58, label: "出口" }]
   };
 
   const TARGET_RULES = [
@@ -45,7 +47,8 @@
     { keys: ["行政通り", "許可局", "許可申請"], target: { map: "administrativeStreet", x: -18, z: -35, label: "許可局" } },
     { keys: ["記録官窓口", "記録官", "行動履歴"], target: { map: "administrativeStreet", x: 18, z: -34, label: "記録官窓口" } },
     { keys: ["王城区", "呼び出し", "上位許可"], target: { map: "administrativeStreet", x: 0, z: -72, label: "王城区方面門" } },
-    { keys: ["商会方面", "市場通り"], target: { map: "plaza", x: 78, z: -34, label: "市場通り・商会方面" } },
+    { keys: ["市場通り・宿屋", "宿屋周辺", "住宅混在"], target: { map: "marketLodgingStreet", x: 0, z: 8, label: "市場通り・宿屋周辺" } },
+    { keys: ["商会方面", "市場通り"], target: { map: "marketLodgingStreet", x: 30, z: -30, label: "市場通り・商会方面" } },
     { keys: ["学院通り"], target: { map: "plaza", x: -78, z: 34, label: "学院通り" } },
     { keys: ["大聖堂", "記録所方面"], target: { map: "plaza", x: -34, z: 78, label: "大聖堂・記録所方面" } },
     { keys: ["ギルド", "登録申請"], target: { map: "plaza", x: 135, z: -70, label: "ギルド" } },
@@ -55,10 +58,11 @@
     { keys: ["模擬戦"], target: { map: "trainingGround", x: 10, z: -8, label: "模擬戦" } },
     { keys: ["教会", "身分", "確認書"], target: { map: "plaza", x: -185, z: -85, label: "教会" } },
     { keys: ["市場", "盗難"], target: { map: "plaza", x: 285, z: 85, label: "市場" } },
+    { keys: ["裏路地導線"], target: { map: "marketLodgingStreet", x: -50, z: 31, label: "裏路地への生活路" } },
     { keys: ["路地裏", "情報屋"], target: { map: "plaza", x: -390, z: 235, label: "路地裏" } },
     { keys: ["講義棟", "キャンパス"], target: { map: "academyCampus", x: 0, z: -52, label: "講義棟" } },
     { keys: ["魔法学院", "学院", "入学相談"], target: { map: "plaza", x: -300, z: -60, label: "魔法学院" } },
-    { keys: ["宿屋", "休ん"], target: { map: "plaza", x: 55, z: 150, label: "宿屋" } }
+    { keys: ["宿屋", "休ん"], target: { map: "marketLodgingStreet", x: -30, z: -30, label: "宿屋" } }
   ];
 
   function bindNextDestinationPanel() {

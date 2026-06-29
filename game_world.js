@@ -110,7 +110,7 @@ const quests = [...new Map(questSeed.map((q) => [q.id, { ...q }])).values()];
 
 const DIALOGUES = {
   wake_after: { speaker: "ユウジ", lines: ["湿った街道の土。遠くに王都の城壁が見える。", "まずは荷車の現場と北門を確認する。"] },
-  caravan_attack: { speaker: "護衛 ガラン・ホルト", lines: ["くそ、二匹いる！　馬を落ち着かせろ！", "そこの旅人——突っ立ってないで手を貸せ。火でも石でもいい、あの黒毛の噛み犬を退かせろ！", "血は演出じゃない。ここで足が止まれば、死ぬのはお前だ。"], choices: [{ text: "魔力弾で獣を止める", done: ["caravan", "merchant"], effect: "fire", trust: { Merchant: 5 }, set: { "player.contract": "商会の紹介状" }, objective: "商人エドリックの紹介状を持って北門へ向かう" }, { text: "石を投げて注意をそらす", done: ["caravan", "merchant"], trust: { Merchant: 3 }, set: { "player.contract": "商会の紹介状" }, objective: "商人エドリックの紹介状を持って北門へ向かう" }] },
+  caravan_attack: { speaker: "護衛 ガラン・ホルト", lines: ["くそ、二匹いる！　馬を落ち着かせろ！", "そこの旅人——突っ立ってないで手を貸せ。火でも石でもいい、あの黒毛の噛み犬を退かせろ！", "会話で済む相手じゃない。距離を取り、Jキーか□ボタンの火球を当てろ！"], choices: [{ text: "火球の射線を作る", objective: "荷車脇の黒毛の噛み犬に火球を当てて商人を救う" }, { text: "距離を取る", objective: "Jキー/□ボタンで黒毛の噛み犬に火球を当てる" }] },
   caravan_after: { speaker: "商人 エドリック・ヴェイン", lines: ["助かった……私はエドリック・ヴェイン。商会の者だ。", "これは封蝋付きの紹介状だ。王都のギルド受付に出すといい。宿屋も門も、少しは顔が通る。", "礼じゃない、借りだ。借りには利息がつく。だが借りを抱えて生き延びるほうが、飢えるより賢い。"] },
   north_gate: { speaker: "門番 ブラム・ガーランド", lines: ["止まれ。私はブラム・ガーランド。規約どおりに扱う。……名と、契約は。", "紹介状——商会の封蝋か。本物だ。今回は通す。だが未契約のままうろつくな。", "逃げるなよ。逃げた者は“消える”。消えた者は、二度と登録できない。大通りを進み、噴水を越えてギルドへ。"], choices: [{ text: "王都へ入る", done: ["gate"], trust: { Crown: 3 }, targetMap: "plaza", spawn: { x: 0, z: 610 }, objective: "中央広場を抜けて冒険者ギルドへ向かう" }] },
   north_gate_after: { speaker: "北門衛兵", lines: ["一度入城確認をした旅人だな。", "王都へ戻るなら通れ。騒ぎは起こすなよ。"], choices: [{ text: "王都へ入る", targetMap: "plaza", spawn: { x: 0, z: 610 }, objective: "王都内で次の目的を進める" }] },
@@ -177,6 +177,8 @@ scene.add(player);
 const state = { started: false, loaded: false, map: null, keys: new Set(), yaw: 0, pitch: 0.08, cameraMode: "third", debug: params.has("debug"), player: { stamina: 100, maxStamina: 100, ...basePlayer, trust: { Guild: 0, Church: 0, Crown: 0, Merchant: 0 } }, quest: quests, active: null, inDialogue: false, dialogueId: null, lineIndex: 0, selected: 0, padButtons: [], fireCooldown: 0, burstCooldown: 0, isDashing: false, drag: false, lastX: 0, lastY: 0, shake: 0, hitStop: 0, timeOfDay: params.get("time") || "day", dayClock: 0, menuOpen: false, hotbarSlot: 1 };
 let bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 };
 let colliders = [], locations = [], npcs = [], movers = [], cullables = [], projectiles = [], bursts = [];
+let caravanThreat = null;
+let systemToastTimer = 0;
 let colliderGrid = new Map();
 let facadeSpecs = [], plainSpecs = [], shopAnchors = [];
 let sunLight, hemiLight, ambLight;
@@ -338,7 +340,8 @@ function nearbyColliders(x, z, r = .58) {
   }
   return out;
 }
-function blocked(x, z, r = .58) { for (const c of nearbyColliders(x, z, r)) if (x > c.x - c.w / 2 - r && x < c.x + c.w / 2 + r && z > c.z - c.d / 2 - r && z < c.z + c.d / 2 + r) return true; for (const m of movers) if (Math.hypot(x - m.obj.position.x, z - m.obj.position.z) < (m.r || .7) + r) return true; return false; }
+function blockedStatic(x, z, r = .58) { for (const c of nearbyColliders(x, z, r)) if (x > c.x - c.w / 2 - r && x < c.x + c.w / 2 + r && z > c.z - c.d / 2 - r && z < c.z + c.d / 2 + r) return true; return false; }
+function blocked(x, z, r = .58) { if (blockedStatic(x, z, r)) return true; for (const m of movers) if (Math.hypot(x - m.obj.position.x, z - m.obj.position.z) < (m.r || .7) + r) return true; return false; }
 function cull(obj, x, z, range = 340) { cullables.push({ obj, x, z, range }); return obj; }
 function boxGeo(w, h, d) { const k = `b${w.toFixed(2)}:${h.toFixed(2)}:${d.toFixed(2)}`; let g = geoCache.get(k); if (!g) { g = new THREE.BoxGeometry(w, h, d); geoCache.set(k, g); } return g; }
 function cylGeo(r, h, seg = 12) { const k = `c${r.toFixed(2)}:${h.toFixed(2)}:${seg}`; let g = geoCache.get(k); if (!g) { g = new THREE.CylinderGeometry(r, r, h, seg); geoCache.set(k, g); } return g; }
@@ -429,6 +432,7 @@ function loadMap(id, spawn) {
   cullables = [];
   projectiles = [];
   bursts = [];
+  caravanThreat = null;
   facadeSpecs = [];
   plainSpecs = [];
   shopAnchors = [];
@@ -658,7 +662,7 @@ function pedestrians() {
 function house(x, z, w, d, h, color, sign = null, important = false, angle = 0) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle; world.add(g); const sH = Math.min(1.1, h * .3), fz = d * .48; box(0, sH / 2, 0, w, sH, d, 0x6f6253, "", g); box(0, sH + (h - sH) / 2, 0, w * .96, h - sH, d * .96, color, "", g); box(0, sH + .95, fz + .07, 1.3, Math.min(1.9, h - sH - .3), .14, 0x2a1c12, "", g); for (const wx of [-w * .29, w * .29]) { box(wx, h - .78, fz + .02, .76, .78, .05, 0x2a1c12, "", g); const gl = add(boxGeo(.58, .6, .05), mat(0xffd486, .4, 0xffb74d, .82), g); gl.position.set(wx, h - .78, fz + .05); } const rh = Math.max(1.3, w * .36), a = Math.atan2(rh, w / 2), L = Math.hypot(w / 2, rh) * 1.05, rc = pick([0x6e2f28, 0x46342a, 0x32506c, 0x2e463a]); for (const s of [-1, 1]) { const pl = add(boxGeo(L, .22, d * 1.12), mat(rc), g, important); pl.position.set(s * w / 4, h + rh / 2, 0); pl.rotation.z = -s * a; } box(0, h + rh, 0, .2, .2, d * 1.14, 0x241a12, "", g); for (const s of [-1, 1]) { const gb = add(unitGable(), mat(color), g); gb.scale.set(w / 2, rh, 1); gb.position.set(0, h, s * fz); if (s < 0) gb.rotation.y = Math.PI; } if (important) { box(w * .32, h + rh * .55, -d * .22, .5, rh * 1.2, .5, 0x4a3a2c, "", g); for (const bx of [-w * .42, 0, w * .42]) box(bx, sH + (h - sH) / 2, fz + .02, .1, h - sH, .05, 0x3b2a1d, "", g); box(0, h - .12, fz + .02, w * .92, .14, .06, 0x3b2a1d, "", g); } if (sign) { box(0, h - .25, fz + .5, .5, .08, .5, 0x241a12, "", g); const lab = label(sign); lab.position.set(0, h - .8, fz + .6); lab.scale.set(1.7, .42, 1); g.add(lab); } const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, important ? "major" : "house"); cull(g, x, z, important ? 900 : 360); }
 function slumHouse(x, z, angle = 0) { const w = rand(5, 10), d = rand(5, 9), h = rand(3, 6); const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle + rand(-.08, .08); world.add(g); box(0, h / 2, 0, w, h, d, pick([0x4f4238, 0x5d4b39, 0x6d5237]), "", g); const roof = box(0, h + .45, 0, w * 1.1, .8, d * 1.05, pick([0x2d2520, 0x3b2a1e, 0x4d2f28]), "", g); roof.rotation.z = rand(-.08, .08); const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, "slumHouse"); cull(g, x, z, 340); }
 function stall(x, z, color) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = roadFacingAngle(x, z); world.add(g); box(0, .35, 0, 3, .7, 1.7, 0x6a4d35, "", g); box(0, 1.35, 0, 3.5, .14, 2.3, color, "", g); for (let i = 0; i < 4; i++) { const item = add(new THREE.DodecahedronGeometry(.16, 0), mat(pick([0xbf5545, 0xd8b36b, 0x5f9056, 0x8f6b3f])), g); item.position.set(rand(-1.1, 1.1), .85, rand(-.5, .5)); } const aabb = rotatedAabb(3.5, 2.3, g.rotation.y); addCollider(x, z, aabb.w, aabb.d, "stall"); cull(g, x, z, 340); }
-function addCaravan(x, z) { const g = cart(); g.position.set(x, 0, z); g.rotation.y = -.22; world.add(g); addNpc("merchant", x + .8, z + 1.4, 0x6f8aa6, "商人", done("merchant") ? "caravan_after" : "caravan_attack"); if (!done("merchant")) { const beast = createBeast(); beast.position.set(x + 2.1, 0, z - .6); beast.rotation.y = -Math.PI / 2; world.add(beast); } addCollider(x, z, 4.2, 3.4, "caravan"); cull(g, x, z, 500); }
+function addCaravan(x, z) { const g = cart(); g.position.set(x, 0, z); g.rotation.y = -.22; world.add(g); addNpc("merchant", x + .8, z + 1.4, 0x6f8aa6, "商人", done("merchant") ? "caravan_after" : "caravan_attack"); if (!done("merchant")) { const beast = createBeast(); const bx = x + 4.35, bz = z - .9; beast.position.set(bx, 0, bz); beast.rotation.y = -Math.PI / 2; world.add(beast); caravanThreat = { obj: beast, x: bx, z: bz, r: 1.15, active: true }; cull(beast, bx, bz, 420); } addCollider(x, z, 4.2, 3.4, "caravan"); cull(g, x, z, 500); }
 function cart() { const g = new THREE.Group(); box(0, .55, 0, 2.8, .8, 1.6, 0x70482c, "", g); const h = createHorse(); h.position.set(0, 0, -1.55); g.add(h); for (const sx of [-1.3, 1.3]) for (const sz of [-.7, .7]) { const w = add(new THREE.TorusGeometry(.36, .07, 8, 18), mat(0x2c2018), g); w.position.set(sx, .35, sz); w.rotation.y = Math.PI / 2; } return g; }
 function createHorse() { const g = new THREE.Group(); box(0, .78, 0, 1.15, .55, .38, 0x5b3a28, "", g); const neck = box(.5, 1.05, 0, .25, .55, .22, 0x5b3a28, "", g); neck.rotation.z = -.35; box(.75, 1.25, 0, .35, .25, .25, 0x5b3a28, "", g); for (const x of [-.38, .38]) for (const z of [-.14, .14]) box(x, .34, z, .12, .65, .12, 0x3b281d, "", g); return g; }
 function createBeast() { const g = new THREE.Group(); box(0, .62, 0, .95, .42, .36, 0x111015, "", g); box(-.58, .72, 0, .36, .28, .32, 0x09090d, "", g); box(-.76, .61, 0, .22, .1, .28, 0x3a0c0c, "", g); return g; }
@@ -702,17 +706,106 @@ function alleyDetails(x, z) { for (let i = 0; i < 12; i++) { crates(x + rand(-25
 function addMarker(l) { const ring = add(new THREE.TorusGeometry(.9, .035, 8, 32), mat(l.targetMap ? 0xd8b36b : 0x87c7ff, .42, l.targetMap ? 0xd8b36b : 0x87c7ff, .7), world); ring.position.set(l.x, .08, l.z); ring.rotation.x = Math.PI / 2; cull(ring, l.x, l.z, 800); }
 function label(text) { const c = document.createElement("canvas"), x = c.getContext("2d"); c.width = 512; c.height = 128; x.fillStyle = "rgba(10,12,18,.72)"; round(x, 12, 20, 488, 88, 18); x.fill(); x.strokeStyle = "rgba(216,179,107,.75)"; x.lineWidth = 4; round(x, 12, 20, 488, 88, 18); x.stroke(); x.fillStyle = "#f6efe1"; x.font = "bold 38px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(text, 256, 64); return new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true })); }
 function round(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
-function updateMovers(dt) { const px = player.position.x, pz = player.position.z; for (const m of movers) { const updateRange = m.type === "cart" ? quality.cull * 1.25 : quality.cull; if (!state.debug && Math.hypot(px - m.obj.position.x, pz - m.obj.position.z) > updateRange) continue; if (m.obj.visible === false) continue; if (m.wait > 0) { m.wait -= dt; continue; } const t = m.path[m.index], dx = t[0] - m.obj.position.x, dz = t[1] - m.obj.position.z, dist = Math.hypot(dx, dz); if (dist < 1.5) { m.index = (m.index + 1) % m.path.length; if (m.type === "ped") m.wait = rand(.2, 1.3); continue; } const vx = dx / dist, vz = dz / dist; m.obj.position.x += vx * m.speed * dt; m.obj.position.z += vz * m.speed * dt; m.obj.rotation.y = Math.atan2(vx, vz); if (m.type === "ped") m.obj.position.y = Math.abs(Math.sin(clock.elapsedTime * 5)) * .025; } }
+function updateMovers(dt) {
+  const px = player.position.x, pz = player.position.z;
+  for (const m of movers) {
+    const updateRange = m.type === "cart" ? quality.cull * 1.25 : quality.cull;
+    if (!state.debug && Math.hypot(px - m.obj.position.x, pz - m.obj.position.z) > updateRange) continue;
+    if (m.obj.visible === false) continue;
+    if (m.wait > 0) { m.wait -= dt; continue; }
+    const t = m.path[m.index], dx = t[0] - m.obj.position.x, dz = t[1] - m.obj.position.z, dist = Math.hypot(dx, dz);
+    if (dist < 1.5) { m.index = (m.index + 1) % m.path.length; if (m.type === "ped") m.wait = rand(.2, 1.3); continue; }
+    const vx = dx / dist, vz = dz / dist, step = m.speed * dt, r = (m.r || .7) * .74;
+    const nx = m.obj.position.x + vx * step, nz = m.obj.position.z + vz * step;
+    if (!state.debug && blockedStatic(nx, nz, r)) {
+      const side = m.avoidTurn || (Math.random() < .5 ? -1 : 1);
+      m.avoidTurn = side;
+      const sx = -vz * side, sz = vx * side, ax = m.obj.position.x + sx * step * .65, az = m.obj.position.z + sz * step * .65;
+      if (!blockedStatic(ax, az, r)) {
+        m.obj.position.x = ax;
+        m.obj.position.z = az;
+        m.obj.rotation.y = Math.atan2(sx, sz);
+      } else {
+        m.index = (m.index + 1) % m.path.length;
+        m.wait = m.type === "cart" ? rand(.35, .9) : rand(.2, .8);
+      }
+      continue;
+    }
+    m.avoidTurn = 0;
+    m.obj.position.x = nx;
+    m.obj.position.z = nz;
+    m.obj.rotation.y = Math.atan2(vx, vz);
+    if (m.type === "ped") m.obj.position.y = Math.abs(Math.sin(clock.elapsedTime * 5)) * .025;
+  }
+}
 function updateCulling() { const px = player.position.x, pz = player.position.z; for (const c of cullables) c.obj.visible = state.debug || Math.hypot(px - c.x, pz - c.z) < c.range; for (const n of npcs) n.visible = state.debug || Math.hypot(px - n.position.x, pz - n.position.z) < quality.cull; }
 function castFireball(mode = "fire", free = false) { if (!state.started || !state.loaded) return; const burst = mode === "burst"; if (!free && (burst ? state.burstCooldown : state.fireCooldown) > 0) return; const cost = burst ? 8 : 3; if (!free && state.player.mp < cost) return; if (!free) { state.player.mp -= cost; burst ? state.burstCooldown = .95 : state.fireCooldown = .32; } audio.play("fireball_cast"); const dir = new THREE.Vector3(); camera.getWorldDirection(dir); const start = new THREE.Vector3(); if (state.cameraMode === "first") { camera.getWorldPosition(start); const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize(); start.addScaledVector(dir, 1.05).addScaledVector(right, .26).add(new THREE.Vector3(0, -.2, 0)); } else { start.copy(player.position).add(new THREE.Vector3(0, 1.35, 0)).addScaledVector(dir, 1.0); } const ball = add(new THREE.SphereGeometry(burst ? .34 : .22, 16, 10), mat(0xff7a1c, .2, 0xff5a00, 2.4), world); ball.position.copy(start); const light = new THREE.PointLight(0xff7a2a, burst ? 6 : 3.6, burst ? 16 : 11, 2); ball.add(light); burstAt(start.clone(), burst ? 0xffd27a : 0xffa64a); state.shake = Math.max(state.shake, .12); projectiles.push({ ball, dir, life: 1.0, speed: burst ? 42 : 32, burst }); updateHud(); }
 function crystalEffect() { audio.play("crystal_crack"); const pos = player.position.clone().add(new THREE.Vector3(0, 1.4, -1)); burstAt(pos, 0x80d8ff); state.shake = .25; }
-function updateEffects(dt) { state.fireCooldown = Math.max(0, state.fireCooldown - dt); state.burstCooldown = Math.max(0, state.burstCooldown - dt); state.shake = Math.max(0, state.shake - dt * 3); if (ui.cooldowns.fire) ui.cooldowns.fire.value = state.fireCooldown ? 1 - state.fireCooldown / .32 : 1; if (ui.cooldowns.burst) ui.cooldowns.burst.value = state.burstCooldown ? 1 - state.burstCooldown / .95 : 1; for (let i = projectiles.length - 1; i >= 0; i--) { const p = projectiles[i]; p.life -= dt; p.ball.position.addScaledVector(p.dir, p.speed * dt); const hit = !state.debug && p.life < .95 && (p.ball.position.y <= .18 || blocked(p.ball.position.x, p.ball.position.z, .25)); if (p.life <= 0 || hit) { audio.play("fireball_hit"); burstAt(p.ball.position, p.burst ? 0xffd27a : 0xff7a1c); state.hitStop = Math.max(state.hitStop, .06); world.remove(p.ball); projectiles.splice(i, 1); } } for (let i = bursts.length - 1; i >= 0; i--) { const b = bursts[i]; b.life -= dt; b.g.scale.setScalar(1 + (1 - b.life / b.max) * 2); if (b.life <= 0) { world.remove(b.g); bursts.splice(i, 1); } } }
+function showSystemToast(title, message) {
+  let box = document.getElementById("aurelia-system-toast");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "aurelia-system-toast";
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-live", "polite");
+    box.style.cssText = "position:fixed;right:18px;bottom:92px;z-index:80;max-width:320px;padding:12px 14px;border:1px solid rgba(216,179,107,.55);border-radius:8px;background:rgba(19,14,10,.9);color:#f6efe1;box-shadow:0 12px 32px rgba(0,0,0,.38);font:13px/1.45 system-ui,sans-serif;opacity:0;transform:translateY(8px);transition:opacity .18s ease,transform .18s ease;pointer-events:none";
+    box.innerHTML = "<strong style=\"display:block;margin-bottom:3px;color:#d8b36b\"></strong><span></span>";
+    document.body.appendChild(box);
+  }
+  box.querySelector("strong").textContent = title;
+  box.querySelector("span").textContent = message;
+  box.style.opacity = "1";
+  box.style.transform = "translateY(0)";
+  clearTimeout(systemToastTimer);
+  systemToastTimer = setTimeout(() => { box.style.opacity = "0"; box.style.transform = "translateY(8px)"; }, 3000);
+}
+function hitCaravanThreat(pos, radius = .35) { return !!(caravanThreat?.active && pos.y < 2.8 && Math.hypot(pos.x - caravanThreat.x, pos.z - caravanThreat.z) <= caravanThreat.r + radius); }
+function resolveCaravanRescue() {
+  if (done("merchant")) return;
+  markDone(["caravan", "merchant"]);
+  setDeep("player.contract", "商会の紹介状");
+  addTrust({ Merchant: 5 });
+  data.objective = "商人エドリックの紹介状を持って北門へ向かう";
+  if (caravanThreat?.obj) {
+    caravanThreat.obj.visible = false;
+    world.remove(caravanThreat.obj);
+  }
+  caravanThreat = null;
+  const spot = locations.find((l) => l.id === "caravan");
+  if (spot) spot.name = "救助済みの荷車を見る";
+  showSystemToast("RESCUE COMPLETE", "商人を救助し、商会の紹介状を受け取った。北門へ向かおう。");
+  updateHud();
+}
+function updateEffects(dt) {
+  state.fireCooldown = Math.max(0, state.fireCooldown - dt);
+  state.burstCooldown = Math.max(0, state.burstCooldown - dt);
+  state.shake = Math.max(0, state.shake - dt * 3);
+  if (ui.cooldowns.fire) ui.cooldowns.fire.value = state.fireCooldown ? 1 - state.fireCooldown / .32 : 1;
+  if (ui.cooldowns.burst) ui.cooldowns.burst.value = state.burstCooldown ? 1 - state.burstCooldown / .95 : 1;
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    p.life -= dt;
+    p.ball.position.addScaledVector(p.dir, p.speed * dt);
+    const hitThreat = !state.debug && p.life < .95 && hitCaravanThreat(p.ball.position, p.burst ? 1.1 : .65);
+    const hit = hitThreat || (!state.debug && p.life < .95 && (p.ball.position.y <= .18 || blocked(p.ball.position.x, p.ball.position.z, .25)));
+    if (p.life <= 0 || hit) {
+      audio.play("fireball_hit");
+      burstAt(p.ball.position, p.burst ? 0xffd27a : 0xff7a1c);
+      if (hitThreat) resolveCaravanRescue();
+      state.hitStop = Math.max(state.hitStop, .06);
+      world.remove(p.ball);
+      projectiles.splice(i, 1);
+    }
+  }
+  for (let i = bursts.length - 1; i >= 0; i--) { const b = bursts[i]; b.life -= dt; b.g.scale.setScalar(1 + (1 - b.life / b.max) * 2); if (b.life <= 0) { world.remove(b.g); bursts.splice(i, 1); } }
+}
 function burstAt(pos, color = 0xff7a1c) { const g = new THREE.Group(); g.position.copy(pos); world.add(g); for (let i = 0; i < 12; i++) add(new THREE.SphereGeometry(.07, 8, 6), mat(color, .32, color, 1.4), g); bursts.push({ g, life: .45, max: .45 }); state.shake = .18; }
-function loop() { let dt = Math.min(clock.getDelta(), .05); if (state.hitStop > 0) { state.hitStop -= dt; dt *= .2; } if (state.started && state.loaded) { if (!params.has("time")) { state.dayClock += dt; if (state.dayClock >= 180) { state.dayClock = 0; setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); } } controls(dt); updateMovers(dt); updateEffects(dt); updateTimeTransition(dt); detect(); updateCulling(); cameraUpdate(); } renderer.render(scene, camera); requestAnimationFrame(loop); }
+function loop() { let dt = Math.min(clock.getDelta(), .05); if (state.hitStop > 0) { state.hitStop -= dt; dt *= .2; } if (state.started && state.loaded) { if (!params.has("time")) { state.dayClock += dt; if (state.dayClock >= 180) { state.dayClock = 0; setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); } } controls(dt); recoverMagic(dt); updateMovers(dt); updateEffects(dt); updateTimeTransition(dt); detect(); updateCulling(); cameraUpdate(); } renderer.render(scene, camera); requestAnimationFrame(loop); }
 function controls(dt) { if (state.menuOpen) return; handlePad(); if (state.inDialogue) return; let x = (state.keys.has("KeyD") ? 1 : 0) - (state.keys.has("KeyA") ? 1 : 0); let y = (state.keys.has("KeyW") ? 1 : 0) - (state.keys.has("KeyS") ? 1 : 0); const p = gamepad(); if (p) { x += dead(p.axes[0] || 0); y += -dead(p.axes[1] || 0); state.yaw -= dead(p.axes[2] || 0) * 2.8 * dt; state.pitch = THREE.MathUtils.clamp(state.pitch - dead(p.axes[3] || 0) * 1.8 * dt, -.55, .75); } state.yaw += ((state.keys.has("ArrowLeft") ? 1 : 0) - (state.keys.has("ArrowRight") ? 1 : 0)) * 2.25 * dt; state.pitch = THREE.MathUtils.clamp(state.pitch + ((state.keys.has("ArrowUp") ? 1 : 0) - (state.keys.has("ArrowDown") ? 1 : 0)) * 1.35 * dt, -.55, .75); if (state.keys.has("KeyJ")) { castFireball("fire"); state.keys.delete("KeyJ"); } if (state.keys.has("KeyL")) { castFireball("burst"); state.keys.delete("KeyL"); } if (state.keys.has("KeyK")) { dodge(); state.keys.delete("KeyK"); } const up = (state.debug && state.keys.has("Space") ? 1 : 0) - (state.debug && (state.keys.has("ControlLeft") || state.keys.has("ControlRight")) ? 1 : 0); const len = Math.hypot(x, y, up); if (len < .01) { regen(dt, 22); return; } x /= Math.max(1, len); y /= Math.max(1, len); const dash = state.keys.has("ShiftLeft") || state.keys.has("ShiftRight") || (p && (p.buttons[7]?.value || 0) > .25); state.isDashing = dash && state.player.stamina > 2; const speed = state.debug ? (state.isDashing ? 120 : 55) : (state.isDashing ? 19.0 : 10.0); if (!state.debug) state.isDashing ? state.player.stamina = Math.max(0, state.player.stamina - 30 * dt) : regen(dt, 18); const rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw), fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw); move((rx * x + fx * y) * speed * dt, (rz * x + fz * y) * speed * dt, up * speed * dt); }
 function move(dx, dz, dy) { const nx = THREE.MathUtils.clamp(player.position.x + dx, bounds.minX, bounds.maxX); if (state.debug || !blocked(nx, player.position.z)) player.position.x = nx; const nz = THREE.MathUtils.clamp(player.position.z + dz, bounds.minZ, bounds.maxZ); if (state.debug || !blocked(player.position.x, nz)) player.position.z = nz; player.position.y = state.debug ? THREE.MathUtils.clamp(player.position.y + dy, 0, 160) : 0; if (Math.hypot(dx, dz) > .001) player.rotation.y = Math.atan2(dx, dz); staminaText(); }
 function dodge() { const back = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw)); move(back.x * 2.8, back.z * 2.8, 0); burstAt(player.position.clone().add(new THREE.Vector3(0, .5, 0)), 0x87c7ff); }
 function regen(dt, a) { state.player.stamina = Math.min(state.player.maxStamina, state.player.stamina + a * dt); staminaText(); }
+function recoverMagic(dt) { const max = state.player.maxMp || 0; if (!max || state.player.mp >= max) return; const before = Math.floor(state.player.mp); state.player.mp = Math.min(max, state.player.mp + 1.15 * dt); if (Math.floor(state.player.mp) !== before || state.player.mp >= max) updateHud(); }
 function gamepad() { const ps = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : []; return ps.find((p) => /dualshock|wireless controller|dualsense|playstation/i.test(p.id)) || ps[0] || null; }
 function dead(v) { return Math.abs(v) < .16 ? 0 : v; }
 function handlePad() { const p = gamepad(); if (!p) return; const now = p.buttons.map((b) => b.pressed); const down = (i) => now[i] && !state.padButtons[i]; if (state.inDialogue) { const y = dead(p.axes[1] || 0); if (down(13) || y > .65) moveChoice(1); if (down(12) || y < -.65) moveChoice(-1); if (down(0)) advance(); if (down(1)) closeDialogue(true); state.padButtons = now; return; } if (down(0) && state.active) interact(); if (down(1)) dodge(); if (down(2)) castFireball("fire"); if (down(3)) castFireball("burst"); if (down(9) || down(11)) state.cameraMode = state.cameraMode === "third" ? "first" : "third"; state.padButtons = now; }
@@ -746,8 +839,46 @@ function choose(c) { audio.play("ui_decide"); if (c.done) markDone(c.done); if (
 function markDone(ids) { ids.forEach((id) => { const q = state.quest.find((x) => x.id === id); if (q) q.done = true; }); }
 function addTrust(obj) { const t = state.player.trust || (state.player.trust = { Guild: 0, Church: 0, Crown: 0, Merchant: 0 }); let up = false; for (const k in obj) { if (obj[k] > 0) up = true; t[k] = (t[k] || 0) + obj[k]; } if (up) audio.play("trust_up"); }
 function setDeep(path, val) { const ks = path.split("."); let t = state; while (ks.length > 1) { const k = ks.shift(); t[k] ??= {}; t = t[k]; } t[ks[0]] = val; }
-function updateHud() { ui.stat.name.textContent = state.player.name; ui.stat.hp.textContent = `${state.player.hp}/${state.player.maxHp}`; ui.stat.mp.textContent = `${state.player.mp}/${state.player.maxMp}`; if (ui.vital.mp) ui.vital.mp.textContent = `${state.player.mp}/${state.player.maxMp}`; renderHearts(); staminaText(); ui.stat.rank.textContent = state.player.rank; ui.stat.contract.textContent = state.player.contract; if (ui.stat.trust) { const tr = state.player.trust || {}; ui.stat.trust.textContent = `ギ${tr.Guild || 0} 教${tr.Church || 0} 王${tr.Crown || 0} 商${tr.Merchant || 0}`; } const objText = (state.debug ? "[DEBUG FLY] " : "") + (data.objective || "ギルドへ向かう"); ui.objective.textContent = objText; if (ui.banner.objective) ui.banner.objective.textContent = objText; const areaNames = { plaza: "王都アウレリア城下町", guildHall: "冒険者ギルド内部", trainingGround: "外門練習場", academy: "王立魔法学院", church: "教会記録所", inn: "宿屋 曲がった匙亭", forestRoad: "王都へ続く森の街道" }; const areaText = (areaNames[state.map] || data.maps?.[state.map]?.name || "王都へ続く森の街道") + (DAYPHASES[state.timeOfDay] ? "　・　" + DAYPHASES[state.timeOfDay].label : ""); ui.area.textContent = areaText; if (ui.banner.area) ui.banner.area.textContent = areaText; const minimaps = { plaza: "[北門]\n  |\n[市場]-[中央広場]-[職人区]\n  |      |\n[スラム]-[ギルド]-[訓練場]\n  |\n[教会]-[学院]-[貴族街]-[王城]", guildHall: "[受付]-[水晶]\n   |\n[ギルドマスター]\n   |\n[出口]", trainingGround: "[入口]-[的]-[模擬戦]", academy: "[書架]-[魔導具]\n   |\n[教師]-[学院生]\n   |\n[出口]", inn: "[客]-[女将]-[酔っ払い]\n   |\n[出口]", church: "[祭壇]\n  |\n[記録係]\n  |\n[出口]", forestRoad: "[森の街道]--[荷車]--[王都門]" }; ui.map.textContent = minimaps[state.map] || data.maps?.[state.map]?.minimap || "[森の街道] -- [王都門]"; renderQuests(); }
+function updateHud() {
+  const mpText = `${Math.floor(state.player.mp)}/${state.player.maxMp}`;
+  ui.stat.name.textContent = state.player.name;
+  ui.stat.hp.textContent = `${state.player.hp}/${state.player.maxHp}`;
+  ui.stat.mp.textContent = mpText;
+  if (ui.vital.mp) ui.vital.mp.textContent = mpText;
+  renderHearts();
+  staminaText();
+  ui.stat.rank.textContent = state.player.rank;
+  ui.stat.contract.textContent = state.player.contract;
+  if (ui.stat.trust) { const tr = state.player.trust || {}; ui.stat.trust.textContent = `ギ${tr.Guild || 0} 教${tr.Church || 0} 王${tr.Crown || 0} 商${tr.Merchant || 0}`; }
+  const objText = (state.debug ? "[DEBUG FLY] " : "") + (data.objective || "ギルドへ向かう");
+  ui.objective.textContent = objText;
+  if (ui.banner.objective) ui.banner.objective.textContent = objText;
+  const areaNames = { plaza: "王都アウレリア城下町", guildHall: "冒険者ギルド内部", trainingGround: "外門練習場", academy: "王立魔法学院", church: "教会記録所", inn: "宿屋 曲がった匙亭", forestRoad: "王都へ続く森の街道" };
+  const areaText = (areaNames[state.map] || data.maps?.[state.map]?.name || "王都へ続く森の街道") + (DAYPHASES[state.timeOfDay] ? "　・　" + DAYPHASES[state.timeOfDay].label : "");
+  ui.area.textContent = areaText;
+  if (ui.banner.area) ui.banner.area.textContent = areaText;
+  const minimaps = { plaza: "[北門]\n  |\n[市場]-[中央広場]-[職人区]\n  |      |\n[スラム]-[ギルド]-[訓練場]\n  |\n[教会]-[学院]-[貴族街]-[王城]", guildHall: "[受付]-[水晶]\n   |\n[ギルドマスター]\n   |\n[出口]", trainingGround: "[入口]-[的]-[模擬戦]", academy: "[書架]-[魔導具]\n   |\n[教師]-[学院生]\n   |\n[出口]", inn: "[客]-[女将]-[酔っ払い]\n   |\n[出口]", church: "[祭壇]\n  |\n[記録係]\n  |\n[出口]", forestRoad: "[森の街道]--[荷車]--[王都門]" };
+  ui.map.textContent = minimaps[state.map] || data.maps?.[state.map]?.minimap || "[森の街道] -- [王都門]";
+  syncProgressHotbar();
+  renderQuests();
+}
 function renderQuests() { ui.quests.innerHTML = ""; state.quest.forEach((q) => { const li = document.createElement("li"); li.textContent = q.text; if (q.done) li.classList.add("done"); ui.quests.appendChild(li); }); }
+function syncProgressHotbar() {
+  if (!ui.hotbar) return;
+  const contract = String(state.player.contract || "");
+  const rank = String(state.player.rank || "");
+  const hasLetter = done("merchant") || contract.includes("紹介状");
+  const hasGuildStatus = done("guild_apply") || done("provisional") || rank.includes("F級");
+  const slot = (n, text, title) => {
+    const el = ui.hotbar.querySelector(`.slot[data-slot="${n}"]`);
+    const name = el?.querySelector(".slot-name");
+    if (!el || !name) return;
+    name.textContent = text;
+    el.title = title;
+  };
+  slot(5, hasLetter ? "紹介状" : "紹介状?", hasLetter ? "商会の紹介状を所持" : "荷車襲撃の黒毛の噛み犬を火球で止めると入手");
+  slot(6, hasGuildStatus ? (done("provisional") || rank.includes("F級") ? "F仮登録" : "申請済") : "ギルド証?", hasGuildStatus ? `ギルド進行: ${rank || "登録申請済み"}` : "紹介状を持ってギルド受付へ");
+}
 function staminaText() { ui.stat.stamina.textContent = `${Math.round(state.player.stamina)}/${state.player.maxStamina}`; if (ui.vital.stamina) ui.vital.stamina.textContent = `${Math.round(state.player.stamina / state.player.maxStamina * 100)}%`; }
 function renderHearts() { if (!ui.hearts) return; const max = Math.max(1, Math.ceil((state.player.maxHp || 200) / 20)); const filled = Math.round((state.player.hp || 0) / 20); let html = ""; for (let i = 0; i < max; i++) html += `<span class="heart${i < filled ? "" : " empty"}">♥</span>`; ui.hearts.innerHTML = html; }
 function selectSlot(n) { state.hotbarSlot = n; if (ui.hotbar) for (const s of ui.hotbar.querySelectorAll(".slot")) s.classList.toggle("is-selected", +s.dataset.slot === n); audio.play("ui_decide"); }

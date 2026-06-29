@@ -69,7 +69,7 @@
   function setVisible(next) {
     visible = next;
     const box = ensureUi();
-    if (visible) render();
+    if (visible) { try { window.__AURELIA_WORLD_MAP__?.hide?.(); } catch {} render(); }
     box.panel.classList.toggle("is-visible", visible);
     box.backdrop.classList.toggle("is-visible", visible);
   }

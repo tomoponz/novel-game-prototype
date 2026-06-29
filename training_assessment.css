@@ -1,0 +1,119 @@
+.training-assessment-panel {
+  position: fixed;
+  z-index: 18;
+  left: 18px;
+  top: 92px;
+  width: min(410px, calc(100vw - 36px));
+  padding: 13px 14px 14px;
+  border: 1px solid rgba(255, 208, 107, .46);
+  border-radius: 16px;
+  background: rgba(17, 13, 8, .78);
+  box-shadow: 0 20px 52px rgba(0, 0, 0, .42), inset 0 0 28px rgba(255, 208, 107, .07);
+  color: var(--paper);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+  transition: opacity .18s ease, visibility .18s ease, transform .18s ease;
+}
+
+.training-assessment-panel.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.training-assessment-kicker {
+  margin: 0 0 7px;
+  color: #ffd06b;
+  font: 800 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .14em;
+}
+
+.training-assessment-title {
+  margin: 0 0 10px;
+  color: #fff1ce;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.training-assessment-grid {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.training-assessment-grid li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .055);
+  color: rgba(246, 239, 225, .84);
+}
+
+.training-assessment-grid b {
+  color: rgba(246, 239, 225, .58);
+  font-weight: 700;
+}
+
+.training-assessment-grid span {
+  text-align: right;
+  color: #8fbfff;
+  font-weight: 800;
+}
+
+.training-assessment-note {
+  margin: 9px 0 0;
+  color: rgba(246, 239, 225, .74);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.training-assessment-ring {
+  position: fixed;
+  z-index: 17;
+  left: 50%;
+  top: 50%;
+  width: min(360px, 58vw);
+  height: min(360px, 58vw);
+  border: 2px solid rgba(255, 208, 107, .5);
+  border-radius: 999px;
+  box-shadow: 0 0 24px rgba(255, 208, 107, .24), inset 0 0 34px rgba(255, 208, 107, .16);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(.76);
+}
+
+.training-assessment-ring.is-visible {
+  visibility: visible;
+  animation: training-ring-scan .78s ease-out forwards;
+}
+
+body.training-assessment-focus #game-canvas {
+  filter: brightness(1.1) saturate(1.12) contrast(1.04);
+}
+
+@keyframes training-ring-scan {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); }
+  30% { opacity: .95; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+@media (max-width: 820px) {
+  .training-assessment-panel {
+    left: 14px;
+    right: 14px;
+    top: 58px;
+    width: auto;
+    padding: 11px 12px;
+  }
+  .training-assessment-title { font-size: 14px; }
+  .training-assessment-grid { font-size: 11px; }
+}

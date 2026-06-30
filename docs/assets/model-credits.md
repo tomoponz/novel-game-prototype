@@ -63,9 +63,9 @@ or failed visibility check leaves the existing primitive fallback visible.
 
 All assets are Quaternius CC0 1.0 (credit optional: Quaternius / quaternius.com).
 Both sets keep the full rigged base body under the outfit (texture-stripped,
-material colors only). Known limitation: the bind pose is a static T-pose and the
-base body shows under the minimal outfit — a Blender-authored single GLB
-(A-pose, hidden parts removed) is the recommended next step.
+material colors only). Known limitation: the bind pose still keeps the arms in a
+T-pose, and the base body shows under the minimal outfit — a Blender-authored
+single GLB (A-pose, hidden parts removed) is the recommended next step.
 
 ## T-pose handling (issue #14)
 
@@ -74,8 +74,8 @@ rigged skeleton but **zero animation clips** (verified — none of the
 `base/outfit/hair` files declare `animations`). The CC0 source packs ship the
 base characters and outfits without baked idle clips, and the texture-strip step
 does not synthesize any. With no clip to sample and an explicit rule against
-destructive bone edits, no safe per-frame pose can be applied to the current
-assets, so the fixed NPCs render in their bind (T) pose.
+destructive bone edits, the current assets cannot fully solve the arm pose at
+runtime, so fixed NPCs still render with bind-pose arms.
 
 What this PR does instead (safe, non-destructive):
 - `loadCharacterModel()` now preserves any `gltf.animations` on the cloned group
@@ -84,6 +84,13 @@ What this PR does instead (safe, non-destructive):
   clip **only for fixed/important NPCs** (not ambient crowd) **when clips exist**.
   Today that path is a no-op because clip count is 0; it activates automatically
   the moment an authored idle-pose GLB is dropped into the same runtime path.
+- Fixed/important NPCs without clips get a tiny non-destructive group-level idle
+  sway so they are no longer perfectly static mannequins. This does not change
+  the skeleton bind pose.
+- `fitExternalNpcModel()` normalizes glTF materials to double-sided, opaque,
+  rough, non-vertex-colored materials before applying role tints. This keeps
+  outfits and hair from disappearing or inheriting broken transparency while
+  preserving the primitive fallback if the model still fails validation.
 - The glTF fallback system (primitive on missing/invalid/under-budget) and
   `SkeletonUtils.clone()` skinning fix are untouched; `?modelDebug=1` still works.
 
@@ -95,4 +102,5 @@ code change beyond the model path):
 
 Priority NPCs for an authored idle pose: guild receptionist, guildmaster,
 academy teacher, inn Marta, priest, guard. Status: **partially done** — mixer
-infrastructure landed; visual T-pose remains until idle assets are provided.
+infrastructure, material safety, validation fallback, and bind-pose idle sway
+landed; full arm-pose cleanup still requires authored idle assets.

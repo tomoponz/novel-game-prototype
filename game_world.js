@@ -359,7 +359,7 @@ scene.add(player);
 const state = { started: false, loaded: false, map: null, keys: new Set(), yaw: 0, pitch: 0.08, cameraMode: "third", debug: params.has("debug"), player: { stamina: 100, maxStamina: 100, ...basePlayer, trust: { Guild: 0, Church: 0, Crown: 0, Merchant: 0 } }, quest: quests, active: null, inDialogue: false, dialogueId: null, lineIndex: 0, selected: 0, padButtons: [], fireCooldown: 0, burstCooldown: 0, isDashing: false, drag: false, lastX: 0, lastY: 0, shake: 0, hitStop: 0, timeOfDay: params.get("time") || "day", dayClock: 0, menuOpen: false, hotbarSlot: 1 };
 let bounds = { minX: -95, maxX: 95, minZ: -135, maxZ: 135 };
 let colliders = [], locations = [], npcs = [], movers = [], cullables = [], projectiles = [], bursts = [], mixers = [];
-let caravanThreat = null;
+let caravanThreat = null, trainingTrial = null;
 let systemToastTimer = 0;
 let colliderGrid = new Map();
 let facadeSpecs = [], plainSpecs = [], shopAnchors = [];
@@ -625,6 +625,7 @@ function loadMap(id, spawn) {
   bursts = [];
   mixers = [];
   caravanThreat = null;
+  trainingTrial = null;
   facadeSpecs = [];
   plainSpecs = [];
   shopAnchors = [];
@@ -1043,7 +1044,34 @@ function buildChurchGrounds() {
     { id: "church_grounds_priest", name: "司祭に身分記録を相談する", x: -6, z: -38, r: 3, dialogue: "church" }
   );
 }
-function buildTrainingGround() { setEnv(0x88a6b4, 25, 180); bounds = { minX: -60, maxX: 60, minZ: -70, maxZ: 70 }; ground(130, 150, 0x556c4c); road(0, 0, 18, 130, 0x776b5a); for (let i = 0; i < 16; i++) cyl(rand(-35, 35), .85, rand(-40, 40), .25, 1.7, 0x7a5635, "target"); addSign(0, 48, "TO CAPITAL"); placeModelNpc("guard", "guard", -8, 12, 0xb77954, "訓練教官", "training", { map: "trainingGround" }); addNpc("adventurer", 10, -8, 0x6f8aa6, "模擬戦相手", "mock_battle"); locations.push({ id: "practice", name: "火球制御を練習する", x: -8, z: 12, r: 4, dialogue: "training" }, { id: "mock", name: "翌日の模擬戦を受ける", x: 10, z: -8, r: 4, dialogue: "mock_battle" }, { id: "training_exit", name: "王都へ戻る", x: 0, z: 52, r: 4, targetMap: "plaza", spawn: { x: 360, z: 305 } }); }
+function addTrainingTarget(x, z, kind = "practice") {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  world.add(g);
+  const color = kind === "mock" ? 0x87c7ff : 0xd8b36b;
+  cyl(0, .75, 0, .32, 1.5, kind === "mock" ? 0x5f708a : 0x7a5635, "", g);
+  box(0, 1.55, 0, 1.35, .16, .16, color, "", g);
+  const marker = makeThreatMarker(kind === "mock" ? "MOCK RIVAL" : "TRAINING TARGET", color);
+  marker.position.set(0, 0, 0);
+  marker.scale.setScalar(kind === "mock" ? .9 : .72);
+  g.add(marker);
+  return { obj: g, marker, x, z, r: kind === "mock" ? 1.25 : 1.05, hp: kind === "mock" ? 2 : 1, maxHp: kind === "mock" ? 2 : 1, kind, active: true };
+}
+function buildTrainingGround() {
+  setEnv(0x88a6b4, 25, 180);
+  bounds = { minX: -60, maxX: 60, minZ: -70, maxZ: 70 };
+  ground(130, 150, 0x556c4c);
+  road(0, 0, 18, 130, 0x776b5a);
+  for (let i = 0; i < 16; i++) cyl(rand(-35, 35), .85, rand(-40, 40), .25, 1.7, 0x7a5635, "target");
+  trainingTrial = { practiceHits: 0, targets: [], mock: null };
+  for (const [tx, tz] of [[-24, -18], [0, -24], [24, -18]]) trainingTrial.targets.push(addTrainingTarget(tx, tz, "practice"));
+  trainingTrial.mock = addTrainingTarget(10, -8, "mock");
+  if (done("mock_battle")) trainingTrial.mock.active = false;
+  addSign(0, 48, "TO CAPITAL");
+  placeModelNpc("guard", "guard", -8, 12, 0xb77954, "訓練教官", "training", { map: "trainingGround" });
+  addNpc("adventurer", 10, -8, 0x6f8aa6, "模擬戦相手", "mock_battle");
+  locations.push({ id: "practice", name: "火球制御を練習する", x: -8, z: 12, r: 4, dialogue: "training" }, { id: "mock", name: "翌日の模擬戦を受ける", x: 10, z: -8, r: 4, dialogue: "mock_battle" }, { id: "training_exit", name: "王都へ戻る", x: 0, z: 52, r: 4, targetMap: "plaza", spawn: { x: 360, z: 305 } });
+}
 function buildAcademy() { setEnv(0x1a1c28, 12, 42); bounds = { minX: -9, maxX: 9, minZ: -8, maxZ: 8 }; ground(18, 16, 0x4a4640, "stone"); world.add(new THREE.HemisphereLight(0xcfd8f0, 0x20222e, 1.85)); const glow = new THREE.PointLight(0xbfd0ff, 7, 26, 2); glow.position.set(0, 4, -2); world.add(glow); room(18, 16, 3.8, 0x383a48); box(0, .6, -5.2, 6, 1.2, 1, 0x5a4a36, "lectern", world, true); for (let i = 0; i < 3; i++) { box(-7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); box(7.6, 1.4, -3 + i * 2.6, .6, 2.8, 2.2, 0x4a3320, "shelf", world, true); } const orb = add(sphGeo(.5, 16, 12), mat(0x8fd2ff, .2, 0x6fb8ff, 1.0), world, false, false); orb.position.set(0, 2.3, -3.6); cull(orb, 0, -3.6, 70); cyl(0, .55, -3.6, .34, .8, 0x55607a, "orbBase", world, true); cyl(4.6, .9, 2.6, .3, 1.8, 0x7a5635, "target", world, true); for (let i = 0; i < 4; i++) box(-3 + i * 2, .35, 4.5, 1.6, .6, 1, 0x4a3a2a, "bench", world, true); placeModelNpc("academyTeacher", "teacher", 0, -3.7, 0x3a2e5a, "魔法学院 教師", "academy_teacher", { map: "academy" }); addNpc("student", -3.2, 1.4, 0x2e3a5c, "学院生", "academy_student"); addNpc("student", 3.4, .8, 0x2e3a5c, "学院生", "academy_student"); locations.push({ id: "academy_teacher", name: "教師と話す", x: 0, z: -3.7, r: 3, dialogue: "academy_teacher" }, { id: "academy_orb", name: "魔導具を調べる", x: 0, z: -3.6, r: 2.6, dialogue: "academy_orb" }, { id: "academy_exit", name: "キャンパスへ戻る", x: 0, z: 7.2, r: 2.4, targetMap: "academyCampus", spawn: { x: 0, z: -46 } }); }
 // 魔法学院キャンパス(別マップ): 正門・中庭・講義棟(内部へ接続)・魔法塔・庭園・練習場・学生群。軽量プリミティブ。
 function buildAcademyCampus() {
@@ -1228,8 +1256,27 @@ function pedestrians() {
 function house(x, z, w, d, h, color, sign = null, important = false, angle = 0) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle; world.add(g); const sH = Math.min(1.1, h * .3), fz = d * .48; box(0, sH / 2, 0, w, sH, d, 0x6f6253, "", g); box(0, sH + (h - sH) / 2, 0, w * .96, h - sH, d * .96, color, "", g); box(0, sH + .95, fz + .07, 1.3, Math.min(1.9, h - sH - .3), .14, 0x2a1c12, "", g); for (const wx of [-w * .29, w * .29]) { box(wx, h - .78, fz + .02, .76, .78, .05, 0x2a1c12, "", g); const gl = add(boxGeo(.58, .6, .05), mat(0xffd486, .4, 0xffb74d, .82), g); gl.position.set(wx, h - .78, fz + .05); } const rh = Math.max(1.3, w * .36), a = Math.atan2(rh, w / 2), L = Math.hypot(w / 2, rh) * 1.05, rc = pick([0x6e2f28, 0x46342a, 0x32506c, 0x2e463a]); for (const s of [-1, 1]) { const pl = add(boxGeo(L, .22, d * 1.12), mat(rc), g, important); pl.position.set(s * w / 4, h + rh / 2, 0); pl.rotation.z = -s * a; } box(0, h + rh, 0, .2, .2, d * 1.14, 0x241a12, "", g); for (const s of [-1, 1]) { const gb = add(unitGable(), mat(color), g); gb.scale.set(w / 2, rh, 1); gb.position.set(0, h, s * fz); if (s < 0) gb.rotation.y = Math.PI; } if (important) { box(w * .32, h + rh * .55, -d * .22, .5, rh * 1.2, .5, 0x4a3a2c, "", g); for (const bx of [-w * .42, 0, w * .42]) box(bx, sH + (h - sH) / 2, fz + .02, .1, h - sH, .05, 0x3b2a1d, "", g); box(0, h - .12, fz + .02, w * .92, .14, .06, 0x3b2a1d, "", g); } if (sign) { box(0, h - .25, fz + .5, .5, .08, .5, 0x241a12, "", g); const lab = label(sign); lab.position.set(0, h - .8, fz + .6); lab.scale.set(1.7, .42, 1); g.add(lab); } const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, important ? "major" : "house"); cull(g, x, z, important ? 900 : 360); }
 function slumHouse(x, z, angle = 0) { const w = rand(5, 10), d = rand(5, 9), h = rand(3, 6); const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = angle + rand(-.08, .08); world.add(g); box(0, h / 2, 0, w, h, d, pick([0x4f4238, 0x5d4b39, 0x6d5237]), "", g); const roof = box(0, h + .45, 0, w * 1.1, .8, d * 1.05, pick([0x2d2520, 0x3b2a1e, 0x4d2f28]), "", g); roof.rotation.z = rand(-.08, .08); const aabb = rotatedAabb(w, d, angle); addCollider(x, z, aabb.w, aabb.d, "slumHouse"); cull(g, x, z, 340); }
 function stall(x, z, color) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = roadFacingAngle(x, z); world.add(g); box(0, .35, 0, 3, .7, 1.7, 0x6a4d35, "", g); box(0, 1.35, 0, 3.5, .14, 2.3, color, "", g); for (let i = 0; i < 4; i++) { const item = add(new THREE.DodecahedronGeometry(.16, 0), mat(pick([0xbf5545, 0xd8b36b, 0x5f9056, 0x8f6b3f])), g); item.position.set(rand(-1.1, 1.1), .85, rand(-.5, .5)); } const aabb = rotatedAabb(3.5, 2.3, g.rotation.y); addCollider(x, z, aabb.w, aabb.d, "stall"); cull(g, x, z, 340); }
-function addCaravan(x, z) { const g = cart(); g.position.set(x, 0, z); g.rotation.y = -.22; world.add(g); addNpc("merchant", x + .8, z + 1.4, 0x6f8aa6, "商人", done("merchant") ? "caravan_after" : "caravan_attack"); if (!done("merchant")) { const beast = createBeast(); const bx = x + 4.35, bz = z - .9; beast.position.set(bx, 0, bz); beast.rotation.y = -Math.PI / 2; world.add(beast); const marker = makeThreatMarker(); marker.position.set(bx, 0, bz); world.add(marker); caravanThreat = { obj: beast, marker, x: bx, z: bz, r: 1.4, active: true }; cull(beast, bx, bz, 420); cull(marker, bx, bz, 620); } addCollider(x, z, 4.2, 3.4, "caravan"); cull(g, x, z, 500); }
-function makeThreatMarker() { const g = new THREE.Group(); const ring = add(new THREE.TorusGeometry(1.35, .085, 8, 28), mat(0xff5a3a, .4, 0xff4a28, 1.5), g); ring.rotation.x = Math.PI / 2; ring.position.y = .12; g.userData.ring = ring; const beam = add(coneGeo(.46, 1, 5), mat(0xff7a4a, .35, 0xff5a2a, 1.8), g); beam.position.y = 2.05; beam.rotation.x = Math.PI; g.userData.beam = beam; const lab = label("⚠ TARGET"); lab.position.set(0, 2.95, 0); lab.scale.set(1.8, .48, 1); g.add(lab); return g; }
+function addCaravan(x, z) { const g = cart(); g.position.set(x, 0, z); g.rotation.y = -.22; world.add(g); addNpc("merchant", x + .8, z + 1.4, 0x6f8aa6, "商人", done("merchant") ? "caravan_after" : "caravan_attack"); if (!done("merchant")) { const beast = createBeast(); const bx = x + 4.35, bz = z - .9; beast.position.set(bx, 0, bz); beast.rotation.y = -Math.PI / 2; world.add(beast); const marker = makeThreatMarker("BITE-HOUND", 0xff5a3a); marker.position.set(bx, 0, bz); world.add(marker); caravanThreat = { obj: beast, marker, x: bx, z: bz, r: 1.4, hp: 3, maxHp: 3, active: true, hitFlash: 0 }; updateThreatHp(marker, 3, 3); cull(beast, bx, bz, 420); cull(marker, bx, bz, 620); } addCollider(x, z, 4.2, 3.4, "caravan"); cull(g, x, z, 500); }
+function makeThreatMarker(text = "TARGET", color = 0xff5a3a) {
+  const g = new THREE.Group();
+  const ring = add(new THREE.TorusGeometry(1.35, .085, 8, 28), mat(color, .4, color, 1.5), g);
+  ring.rotation.x = Math.PI / 2; ring.position.y = .12; g.userData.ring = ring;
+  const beam = add(coneGeo(.46, 1, 5), mat(color, .35, color, 1.8), g);
+  beam.position.y = 2.05; beam.rotation.x = Math.PI; g.userData.beam = beam;
+  box(0, 2.62, 0, 1.7, .11, .08, 0x241414, "", g);
+  const hp = box(0, 2.63, 0, 1.55, .08, .1, color, "", g);
+  g.userData.hpFill = hp;
+  const lab = label(text);
+  lab.position.set(0, 2.95, 0); lab.scale.set(1.8, .48, 1); g.add(lab);
+  return g;
+}
+function updateThreatHp(marker, hp, maxHp) {
+  const fill = marker?.userData?.hpFill;
+  if (!fill) return;
+  const pct = THREE.MathUtils.clamp(maxHp ? hp / maxHp : 0, 0, 1);
+  fill.scale.x = pct;
+  fill.position.x = -(1 - pct) * .775;
+}
 function cart() { const g = new THREE.Group(); box(0, .55, 0, 2.8, .8, 1.6, 0x70482c, "", g); const h = createHorse(); h.position.set(0, 0, -1.55); g.add(h); for (const sx of [-1.3, 1.3]) for (const sz of [-.7, .7]) { const w = add(new THREE.TorusGeometry(.36, .07, 8, 18), mat(0x2c2018), g); w.position.set(sx, .35, sz); w.rotation.y = Math.PI / 2; } return g; }
 function createHorse() { const g = new THREE.Group(); box(0, .78, 0, 1.15, .55, .38, 0x5b3a28, "", g); const neck = box(.5, 1.05, 0, .25, .55, .22, 0x5b3a28, "", g); neck.rotation.z = -.35; box(.75, 1.25, 0, .35, .25, .25, 0x5b3a28, "", g); for (const x of [-.38, .38]) for (const z of [-.14, .14]) box(x, .34, z, .12, .65, .12, 0x3b281d, "", g); return g; }
 function createBeast() { const g = new THREE.Group(); box(0, .62, 0, .95, .42, .36, 0x111015, "", g); box(-.58, .72, 0, .36, .28, .32, 0x09090d, "", g); box(-.76, .61, 0, .22, .1, .28, 0x3a0c0c, "", g); return g; }
@@ -1332,6 +1379,66 @@ function showSystemToast(title, message) {
   systemToastTimer = setTimeout(() => { box.style.opacity = "0"; box.style.transform = "translateY(8px)"; }, 3000);
 }
 function hitCaravanThreat(pos, radius = .35) { return !!(caravanThreat?.active && pos.y < 2.8 && Math.hypot(pos.x - caravanThreat.x, pos.z - caravanThreat.z) <= caravanThreat.r + radius); }
+function damageCaravanThreat(damage = 1) {
+  if (!caravanThreat?.active) return;
+  caravanThreat.hp = Math.max(0, (caravanThreat.hp || 1) - damage);
+  caravanThreat.hitFlash = .28;
+  updateThreatHp(caravanThreat.marker, caravanThreat.hp, caravanThreat.maxHp || 3);
+  if (caravanThreat.hp > 0) {
+    showSystemToast("HOUND STAGGERED", `Black bite-hound HP ${caravanThreat.hp}/${caravanThreat.maxHp || 3}`);
+    return;
+  }
+  resolveCaravanRescue();
+}
+function completeTrainingPractice(target) {
+  if (!target?.active) return;
+  target.active = false;
+  target.obj.visible = false;
+  trainingTrial.practiceHits = (trainingTrial.practiceHits || 0) + 1;
+  if (!done("training")) {
+    markDone(["training"]);
+    addTrust({ Guild: 2 });
+    data.objective = "翌日の模擬戦を受ける";
+    showSystemToast("TRAINING LOGGED", "Fireball control was recorded in the guild training ledger.");
+  } else {
+    showSystemToast("TARGET HIT", "Training target neutralized.");
+  }
+  updateHud();
+}
+function resolveMockBattleFromArena() {
+  if (done("mock_battle")) return;
+  markDone(["mock_battle"]);
+  addTrust({ Guild: 6 });
+  setDeep("player.rank", "F級冒険者");
+  data.objective = "西の魔法学院を訪ね、入学相談をする";
+  if (trainingTrial?.mock) {
+    trainingTrial.mock.active = false;
+    updateThreatHp(trainingTrial.mock.marker, 0, trainingTrial.mock.maxHp || 2);
+  }
+  showSystemToast("MOCK BATTLE CLEARED", "Control, survival, and restraint were added to the guild record.");
+  updateHud();
+}
+function hitTrainingTarget(pos, radius = .35, damage = 1) {
+  if (state.map !== "trainingGround" || !trainingTrial || pos.y > 3.2) return false;
+  for (const t of trainingTrial.targets || []) {
+    if (!t.active || Math.hypot(pos.x - t.x, pos.z - t.z) > t.r + radius) continue;
+    t.hp = Math.max(0, t.hp - damage);
+    updateThreatHp(t.marker, t.hp, t.maxHp);
+    if (t.hp <= 0) completeTrainingPractice(t);
+    return true;
+  }
+  const mock = trainingTrial.mock;
+  if (!mock?.active || done("mock_battle") || Math.hypot(pos.x - mock.x, pos.z - mock.z) > mock.r + radius) return false;
+  if (!done("training")) {
+    showSystemToast("CONTROL REQUIRED", "Hit a training target before the mock battle.");
+    return true;
+  }
+  mock.hp = Math.max(0, mock.hp - damage);
+  updateThreatHp(mock.marker, mock.hp, mock.maxHp);
+  if (mock.hp <= 0) resolveMockBattleFromArena();
+  else showSystemToast("MOCK RIVAL STAGGERED", `Mock battle HP ${mock.hp}/${mock.maxHp}`);
+  return true;
+}
 function resolveCaravanRescue() {
   if (done("merchant")) return;
   markDone(["caravan", "merchant"]);
@@ -1349,26 +1456,28 @@ function resolveCaravanRescue() {
   caravanThreat = null;
   const spot = locations.find((l) => l.id === "caravan");
   if (spot) spot.name = "救助済みの荷車を見る";
-  showSystemToast("RESCUE COMPLETE", "商人を救助し、商会の紹介状を受け取った。北門へ向かおう。");
+  showSystemToast("商人救助 / RESCUE COMPLETE", "商人エドリックを噛み犬から救った。『助かった……今の魔法は何だ。ともかく、礼だ』——商会の紹介状を受け取り、商会の信用(Merchant Trust +5)が上がった。これは身分証ではなく、商会の信用を借りた一時通行の証。北門でこれを示せば、王都へ入れる。");
   updateHud();
 }
 function updateEffects(dt) {
   state.fireCooldown = Math.max(0, state.fireCooldown - dt);
   state.burstCooldown = Math.max(0, state.burstCooldown - dt);
   state.shake = Math.max(0, state.shake - dt * 3);
-  if (caravanThreat?.active && caravanThreat.marker) { const t = clock.elapsedTime, pulse = 1 + Math.sin(t * 4.2) * .15; const mk = caravanThreat.marker; if (mk.userData.ring) mk.userData.ring.scale.set(pulse, pulse, 1); if (mk.userData.beam) mk.userData.beam.position.y = 2.05 + Math.sin(t * 3) * .14; }
+  if (caravanThreat?.active && caravanThreat.marker) { caravanThreat.hitFlash = Math.max(0, (caravanThreat.hitFlash || 0) - dt); const t = clock.elapsedTime, pulse = 1 + Math.sin(t * 4.2) * .15 + caravanThreat.hitFlash * 1.2; const mk = caravanThreat.marker; if (mk.userData.ring) mk.userData.ring.scale.set(pulse, pulse, 1); if (mk.userData.beam) mk.userData.beam.position.y = 2.05 + Math.sin(t * 3) * .14; }
   if (ui.cooldowns.fire) ui.cooldowns.fire.value = state.fireCooldown ? 1 - state.fireCooldown / .32 : 1;
   if (ui.cooldowns.burst) ui.cooldowns.burst.value = state.burstCooldown ? 1 - state.burstCooldown / .95 : 1;
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
     p.life -= dt;
     p.ball.position.addScaledVector(p.dir, p.speed * dt);
-    const hitThreat = !state.debug && p.life < .95 && hitCaravanThreat(p.ball.position, p.burst ? 1.1 : .65);
-    const hit = hitThreat || (!state.debug && p.life < .95 && (p.ball.position.y <= .18 || blocked(p.ball.position.x, p.ball.position.z, .25)));
+    const radius = p.burst ? 1.1 : .65, dmg = p.burst ? 2 : 1;
+    const hitThreat = !state.debug && p.life < .95 && hitCaravanThreat(p.ball.position, radius);
+    const hitTarget = !hitThreat && !state.debug && p.life < .95 && hitTrainingTarget(p.ball.position, radius, dmg);
+    const hit = hitThreat || hitTarget || (!state.debug && p.life < .95 && (p.ball.position.y <= .18 || blocked(p.ball.position.x, p.ball.position.z, .25)));
     if (p.life <= 0 || hit) {
       audio.play("fireball_hit");
       burstAt(p.ball.position, p.burst ? 0xffd27a : 0xff7a1c);
-      if (hitThreat) resolveCaravanRescue();
+      if (hitThreat) damageCaravanThreat(dmg);
       state.hitStop = Math.max(state.hitStop, .06);
       world.remove(p.ball);
       projectiles.splice(i, 1);
@@ -1478,7 +1587,7 @@ function closeMenu() { if (!state.menuOpen) return; state.menuOpen = false; ui.m
 function toggleMenu() { state.menuOpen ? closeMenu() : openMenu(); }
 function bindMenu() { ui.menuClose?.addEventListener("click", closeMenu); ui.menu?.addEventListener("click", (e) => { if (e.target === ui.menu) closeMenu(); }); }
 function bindAudioToggle() { if (!ui.audioToggle) return; ui.audioToggle.addEventListener("change", () => { audio.enable(); audio.setMuted(!ui.audioToggle.checked); }); }
-window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, items: () => syncPermits(), movers: () => ({ total: movers.length, byType: movers.reduce((a, m) => (a[m.type] = (a[m.type] || 0) + 1, a), {}), stuck: movers.filter((m) => (m.stuck || 0) > 6).length, sample: movers.slice(0, 8).map((m) => ({ type: m.type, x: +m.obj.position.x.toFixed(1), z: +m.obj.position.z.toFixed(1), idx: m.index, stuck: m.stuck || 0, wait: +(m.wait || 0).toFixed(2), visible: m.obj.visible !== false })) }), resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
+window.__AURELIA_DEBUG__ = { state, quests: () => state.quest.map((q) => `${q.done ? "✓" : "・"} ${q.id}: ${q.text}`), jump: (map, x = 0, z = 0) => loadMap(map, { x, z }), complete: (...ids) => { markDone(ids); updateHud(); }, items: () => syncPermits(), movers: () => ({ total: movers.length, byType: movers.reduce((a, m) => (a[m.type] = (a[m.type] || 0) + 1, a), {}), stuck: movers.filter((m) => (m.stuck || 0) > 6).length, sample: movers.slice(0, 8).map((m) => ({ type: m.type, x: +m.obj.position.x.toFixed(1), z: +m.obj.position.z.toFixed(1), idx: m.index, stuck: m.stuck || 0, wait: +(m.wait || 0).toFixed(2), visible: m.obj.visible !== false })) }), resolve: (dlg) => resolveDialogueId({ dialogue: dlg }), progress: PROGRESS, fx: () => ({ projectiles: projectiles.length, bursts: bursts.length, worldChildren: world.children.length }), cast: (m) => castFireball(m || "fire", true), threatHp: () => caravanThreat ? { hp: caravanThreat.hp, maxHp: caravanThreat.maxHp, active: caravanThreat.active } : null, damageCaravanThreat: (d = 1) => { damageCaravanThreat(d); return caravanThreat ? caravanThreat.hp : 0; }, hitTraining: (x, z, d = 1) => hitTrainingTarget({ x, y: 1, z }, .6, d), trainingTrial: () => trainingTrial && { practiceHits: trainingTrial.practiceHits, targets: (trainingTrial.targets || []).map((t) => ({ x: t.x, z: t.z, hp: t.hp, active: t.active })), mock: trainingTrial.mock && { hp: trainingTrial.mock.hp, active: trainingTrial.mock.active } }, nColliders: () => colliders.length, blocked: (x, z) => blocked(x, z), nearestCollider: (x, z) => { let best = null, bd = Infinity; for (const c of colliders) { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = c; } } return best ? { x: +best.x.toFixed(1), z: +best.z.toFixed(1), w: +best.w.toFixed(1), d: +best.d.toFixed(1), label: best.label, dist: +bd.toFixed(1) } : null; },
 peek: () => ({ cam: camera.position.toArray().map((n) => +n.toFixed(1)), dir: (() => { const d = new THREE.Vector3(); camera.getWorldDirection(d); return d.toArray().map((n) => +n.toFixed(2)); })(), balls: projectiles.map((p) => { const ndc = p.ball.position.clone().project(camera); return { pos: p.ball.position.toArray().map((n) => +n.toFixed(1)), visible: p.ball.visible, inScene: !!p.ball.parent, emis: p.ball.material.emissiveIntensity, ndc: [+ndc.x.toFixed(2), +ndc.y.toFixed(2), +ndc.z.toFixed(2)] }; }) }) };
 // 公式ミニマップAPI(読み取り専用): next_destination.js はこれを優先利用し、cameraからの近似(approx)位置を使わない。
 window.__AURELIA_MINIMAP__ = () => ({

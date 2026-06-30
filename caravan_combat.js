@@ -210,6 +210,8 @@
   function updateCombat(dt) {
     const active = activeInfo();
     if (!active) { updateUi(); return; }
+    const th = debug()?.threatHp?.();           // 本体のHPをパネル表示へ同期
+    if (th && typeof th.hp === "number") combat.hp = th.hp;
     combat.dodging = Math.max(0, combat.dodging - dt);
     combat.damageLock = Math.max(0, combat.damageLock - dt);
     combat.timer -= dt;
@@ -229,14 +231,12 @@
     if (d < (forgiving ? 5.2 : 3.8)) damagePlayer();
   }
 
+  // 命中・HP・撃退は本体(game_world)の火球projectile + damageCaravanThreat が担当。
+  // ここは予兆/警告/回避/被弾などのDOM演出のみ。J/L は横取りせず本体の火球へ通す。
   addEventListener("keydown", (e) => {
     const active = activeInfo();
     if (!active) return;
-    if (e.code === "KeyK") { combat.dodging = .55; return; }
-    if (e.code !== "KeyJ" && e.code !== "KeyL") return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    hitThreat(e.code === "KeyL" ? "burst" : "fire");
+    if (e.code === "KeyK") combat.dodging = .55; // 回避の無敵窓(本体のKでも実移動する)
   }, true);
 
   function loop(now) {

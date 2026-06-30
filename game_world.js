@@ -523,7 +523,16 @@ function nearbyColliders(x, z, r = .58) {
   return out;
 }
 function blockedStatic(x, z, r = .58) { for (const c of nearbyColliders(x, z, r)) if (x > c.x - c.w / 2 - r && x < c.x + c.w / 2 + r && z > c.z - c.d / 2 - r && z < c.z + c.d / 2 + r) return true; return false; }
-function blocked(x, z, r = .58) { if (blockedStatic(x, z, r)) return true; for (const m of movers) if (Math.hypot(x - m.obj.position.x, z - m.obj.position.z) < (m.r || .7) + r) return true; return false; }
+function blockedDynamic(x, z, r = .58, self = null, includePlayer = false) {
+  for (const m of movers) {
+    if (m === self || !m.obj || m.obj.visible === false) continue;
+    const mr = (m.r || .7) * (includePlayer ? .82 : 1);
+    if (Math.hypot(x - m.obj.position.x, z - m.obj.position.z) < mr + r) return true;
+  }
+  return includePlayer && state.loaded && Math.hypot(x - player.position.x, z - player.position.z) < r + .62;
+}
+function blockedMover(x, z, r = .58, self = null) { return blockedStatic(x, z, r) || blockedDynamic(x, z, r, self, true); }
+function blocked(x, z, r = .58) { return blockedStatic(x, z, r) || blockedDynamic(x, z, r); }
 function cull(obj, x, z, range = 340) { cullables.push({ obj, x, z, range }); return obj; }
 function boxGeo(w, h, d) { const k = `b${w.toFixed(2)}:${h.toFixed(2)}:${d.toFixed(2)}`; let g = geoCache.get(k); if (!g) { g = new THREE.BoxGeometry(w, h, d); geoCache.set(k, g); } return g; }
 function cylGeo(r, h, seg = 12) { const k = `c${r.toFixed(2)}:${h.toFixed(2)}:${seg}`; let g = geoCache.get(k); if (!g) { g = new THREE.CylinderGeometry(r, r, h, seg); geoCache.set(k, g); } return g; }
@@ -648,18 +657,35 @@ function loadCharacterModel(key, urls) {
   });
 }
 function matKind(name) { name = (name || "").toLowerCase(); if (name.includes("hair") || name.includes("beard")) return "hair"; if (name.includes("eye")) return "eye"; if (name.includes("peasant") || name.includes("ranger") || name.includes("outfit") || name.includes("cloth") || name.includes("robe")) return "outfit"; return "skin"; }
+function sanitizeExternalNpcMaterial(m, kind, tint) {
+  if (!m) return;
+  m.side = THREE.DoubleSide;
+  m.transparent = false;
+  m.opacity = 1;
+  m.depthWrite = true;
+  m.alphaTest = 0;
+  if ("vertexColors" in m) m.vertexColors = false;
+  if ("roughness" in m) m.roughness = Math.max(m.roughness || 0, .82);
+  if ("metalness" in m) m.metalness = Math.min(m.metalness || 0, .05);
+  if (tint && m.color) {
+    const c = tint[kind];
+    if (c != null) m.color.setHex(c);
+  }
+  m.needsUpdate = true;
+}
 function fitExternalNpcModel(model, scale, tint, castShadow = false) {
   model.scale.setScalar(scale);
   model.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(model);
   if (Number.isFinite(box.min.y)) model.position.y -= box.min.y;
   model.traverse((obj) => {
-    if (!obj.isMesh) return;
+    if (!obj.isMesh && !obj.isSkinnedMesh) return;
     obj.castShadow = Boolean(castShadow);
     obj.receiveShadow = false;
-    obj.frustumCulled = true;
+    obj.frustumCulled = !obj.isSkinnedMesh;
+    if (!obj.material) obj.material = new THREE.MeshStandardMaterial({ color: tint?.outfit || 0x8a6a44, roughness: .86, metalness: 0, side: THREE.DoubleSide });
     const mats = (Array.isArray(obj.material) ? obj.material : [obj.material]).filter(Boolean);
-    mats.forEach((m) => { m.roughness = Math.max(m.roughness || 0, .82); if (tint && m.color) { const c = tint[matKind(m.name)]; if (c != null) m.color.setHex(c); } m.needsUpdate = true; });
+    mats.forEach((m) => sanitizeExternalNpcMaterial(m, matKind(m.name || obj.name), tint));
   });
   return model;
 }
@@ -737,13 +763,15 @@ function addHumanNpc(variant, x, z, color, name, dialogue, options = {}) {
 }
 // 表示検証: meshが存在し、Box3の高さが妥当な範囲にあるか（崩壊/極小/巨大なら不合格）
 function verifyModelVisible(model) {
-  let meshes = 0; model.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) meshes++; });
+  let meshes = 0, vertices = 0; model.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) { meshes++; vertices += o.geometry?.attributes?.position?.count || 0; } });
   if (meshes < 1) return { ok: false, reason: "no-mesh" };
+  if (vertices < 20) return { ok: false, reason: "no-verts" };
   const box = new THREE.Box3().setFromObject(model);
   if (box.isEmpty()) return { ok: false, reason: "empty-box" };
   const size = new THREE.Vector3(); box.getSize(size);
   if (![size.x, size.y, size.z].every(Number.isFinite)) return { ok: false, reason: "non-finite" };
   if (size.y < 1.0 || size.y > 3.5) return { ok: false, reason: "h" + size.y.toFixed(2) };
+  if (size.x < .15 || size.z < .05 || size.x > 2.6 || size.z > 2.6) return { ok: false, reason: "footprint" };
   return { ok: true, height: size.y };
 }
 function setModelStatus(n, modelKey, status, reason) {
@@ -760,6 +788,19 @@ function addModelDebugTag(n, text) {
   const old = n.getObjectByName("__dbgTag"); if (old) { n.remove(old); old.material?.map?.dispose?.(); }
   const tag = label("GLTF " + text); tag.name = "__dbgTag"; tag.position.set(0, 3.05, 0); tag.scale.set(2.0, .5, 1);
   n.add(tag);
+}
+function startBindPoseIdle(n) {
+  n.userData.bindPoseIdle = { phase: rand(0, Math.PI * 2), baseY: n.position.y, baseRoll: n.rotation.z || 0 };
+}
+function updateNpcIdle(dt) {
+  for (const n of npcs) {
+    const idle = n.userData?.bindPoseIdle;
+    if (!idle || n.visible === false) continue;
+    idle.phase += dt * .92;
+    const sway = Math.sin(idle.phase);
+    n.position.y = idle.baseY + sway * .018;
+    n.rotation.z = idle.baseRoll + sway * .007;
+  }
 }
 function placeModelNpc(modelKey, fallbackVariant, x, z, color, name, dialogue, options = {}) {
   const def = CHARACTER_MODELS[modelKey];
@@ -792,14 +833,16 @@ function placeModelNpc(modelKey, fallbackVariant, x, z, color, name, dialogue, o
     if (def.offset) fitted.position.set((def.offset.x || 0), fitted.position.y + (def.offset.y || 0), (def.offset.z || 0));
     n.remove(fallback);
     n.add(fitted);
-    setModelStatus(n, modelKey, "loaded");
-    // 重要な固定NPCのみ: アニメclipがあれば idle を再生(現状の素体は0個なのでT字のまま=既知の制限)。
     const clips = fitted.userData.clips;
+    setModelStatus(n, modelKey, "loaded", clips && clips.length ? "clip" : (!options.reservedModelSlot ? "bind-idle" : "no-clip"));
+    // 重要な固定NPCのみ: アニメclipがあれば idle を再生(現状の素体は0個なのでT字のまま=既知の制限)。
     if (clips && clips.length && !options.reservedModelSlot) {
       const mixer = new THREE.AnimationMixer(fitted);
       const idle = clips.find((c) => /idle|stand|breath/i.test(c.name)) || clips[0];
       mixer.clipAction(idle).play();
       mixers.push(mixer);
+    } else if (!clips?.length && !options.reservedModelSlot) {
+      startBindPoseIdle(n);
     }
   }).catch(() => setModelStatus(n, modelKey, "fallback", "load-error"));
   return n;
@@ -1241,13 +1284,13 @@ function updateMovers(dt) {
     if (dist < 1.5) { m.index = (m.index + 1) % m.path.length; if (m.type === "ped") m.wait = rand(.2, 1.3); continue; }
     const vx = dx / dist, vz = dz / dist, step = m.speed * dt, r = (m.r || .7) * .74;
     const nx = m.obj.position.x + vx * step, nz = m.obj.position.z + vz * step;
-    if (!state.debug && blockedStatic(nx, nz, r)) {
+    if (!state.debug && blockedMover(nx, nz, r, m)) {
       m.stuck = (m.stuck || 0) + 1;
       const side = m.avoidTurn || (Math.random() < .5 ? -1 : 1);
       m.avoidTurn = side;
       const sx = -vz * side, sz = vx * side, ax = m.obj.position.x + sx * step * .65, az = m.obj.position.z + sz * step * .65;
       // 横回避が通れば滑らせる。ただし長く詰まり続けたら(grind防止)経路を進めて再ルート。
-      if (m.stuck < 14 && !blockedStatic(ax, az, r)) {
+      if (m.stuck < 14 && !blockedMover(ax, az, r, m)) {
         m.obj.position.x = ax;
         m.obj.position.z = az;
         m.obj.rotation.y = Math.atan2(sx, sz);
@@ -1335,7 +1378,7 @@ function updateEffects(dt) {
   for (const mx of mixers) mx.update(dt);
 }
 function burstAt(pos, color = 0xff7a1c) { const g = new THREE.Group(); g.position.copy(pos); world.add(g); for (let i = 0; i < 12; i++) add(new THREE.SphereGeometry(.07, 8, 6), mat(color, .32, color, 1.4), g); bursts.push({ g, life: .45, max: .45 }); state.shake = .18; }
-function loop() { let dt = Math.min(clock.getDelta(), .05); if (state.hitStop > 0) { state.hitStop -= dt; dt *= .2; } if (state.started && state.loaded) { if (!params.has("time")) { state.dayClock += dt; if (state.dayClock >= 180) { state.dayClock = 0; setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); } } controls(dt); recoverMagic(dt); updateMovers(dt); updateEffects(dt); updateTimeTransition(dt); detect(); updateCulling(); cameraUpdate(); } renderer.render(scene, camera); requestAnimationFrame(loop); }
+function loop() { let dt = Math.min(clock.getDelta(), .05); if (state.hitStop > 0) { state.hitStop -= dt; dt *= .2; } if (state.started && state.loaded) { if (!params.has("time")) { state.dayClock += dt; if (state.dayClock >= 180) { state.dayClock = 0; setTimeOfDay(PHASE_ORDER[(PHASE_ORDER.indexOf(state.timeOfDay) + 1) % 4]); } } controls(dt); recoverMagic(dt); updateMovers(dt); updateNpcIdle(dt); updateEffects(dt); updateTimeTransition(dt); detect(); updateCulling(); cameraUpdate(); } renderer.render(scene, camera); requestAnimationFrame(loop); }
 function controls(dt) { if (state.menuOpen) return; handlePad(); if (state.inDialogue) return; let x = (state.keys.has("KeyD") ? 1 : 0) - (state.keys.has("KeyA") ? 1 : 0); let y = (state.keys.has("KeyW") ? 1 : 0) - (state.keys.has("KeyS") ? 1 : 0); const p = gamepad(); if (p) { x += dead(p.axes[0] || 0); y += -dead(p.axes[1] || 0); state.yaw -= dead(p.axes[2] || 0) * 2.8 * dt; state.pitch = THREE.MathUtils.clamp(state.pitch - dead(p.axes[3] || 0) * 1.8 * dt, -.55, .75); } state.yaw += ((state.keys.has("ArrowLeft") ? 1 : 0) - (state.keys.has("ArrowRight") ? 1 : 0)) * 2.25 * dt; state.pitch = THREE.MathUtils.clamp(state.pitch + ((state.keys.has("ArrowUp") ? 1 : 0) - (state.keys.has("ArrowDown") ? 1 : 0)) * 1.35 * dt, -.55, .75); if (state.keys.has("KeyJ")) { castFireball("fire"); state.keys.delete("KeyJ"); } if (state.keys.has("KeyL")) { castFireball("burst"); state.keys.delete("KeyL"); } if (state.keys.has("KeyK")) { dodge(); state.keys.delete("KeyK"); } const up = (state.debug && state.keys.has("Space") ? 1 : 0) - (state.debug && (state.keys.has("ControlLeft") || state.keys.has("ControlRight")) ? 1 : 0); const len = Math.hypot(x, y, up); if (len < .01) { regen(dt, 22); return; } x /= Math.max(1, len); y /= Math.max(1, len); const dash = state.keys.has("ShiftLeft") || state.keys.has("ShiftRight") || (p && (p.buttons[7]?.value || 0) > .25); state.isDashing = dash && state.player.stamina > 2; const speed = state.debug ? (state.isDashing ? 120 : 55) : (state.isDashing ? 19.0 : 10.0); if (!state.debug) state.isDashing ? state.player.stamina = Math.max(0, state.player.stamina - 30 * dt) : regen(dt, 18); const rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw), fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw); move((rx * x + fx * y) * speed * dt, (rz * x + fz * y) * speed * dt, up * speed * dt); }
 function move(dx, dz, dy) { const nx = THREE.MathUtils.clamp(player.position.x + dx, bounds.minX, bounds.maxX); if (state.debug || !blocked(nx, player.position.z)) player.position.x = nx; const nz = THREE.MathUtils.clamp(player.position.z + dz, bounds.minZ, bounds.maxZ); if (state.debug || !blocked(player.position.x, nz)) player.position.z = nz; player.position.y = state.debug ? THREE.MathUtils.clamp(player.position.y + dy, 0, 160) : 0; if (Math.hypot(dx, dz) > .001) player.rotation.y = Math.atan2(dx, dz); staminaText(); }
 function dodge() { const back = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw)); move(back.x * 2.8, back.z * 2.8, 0); burstAt(player.position.clone().add(new THREE.Vector3(0, .5, 0)), 0x87c7ff); }

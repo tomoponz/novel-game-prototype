@@ -228,11 +228,12 @@ Branch `feature/resolve-open-gameplay-issues-20260629` advances open issues
 - #12 Caravan: a pulsing `⚠ TARGET` marker sits over the bite-hound, hit radius
   is slightly more forgiving, and the rescue still cannot be completed by
   dialogue alone.
-- #13 Movers: a stuck-counter forces a re-route so pedestrians/carts cannot
-  grind a wall forever; `__AURELIA_DEBUG__.movers()` added. Still collider-based.
-- #14 T-pose: idle-animation infrastructure is in place but the current CC0
-  assets contain no clips, so the T-pose remains until authored idle GLBs are
-  supplied (see `docs/assets/model-credits.md`).
+- #13 Movers: pedestrians/carts now check nearby movers and the player before
+  stepping, then sidestep or re-route when blocked. Still collider-based, not A*.
+- #14 T-pose/model polish: glTF NPC materials are normalized for safer clothing
+  colors/opacity, invalid models keep the primitive fallback, and fixed NPCs get
+  a small bind-pose idle sway when no authored clips exist. Full arm-pose cleanup
+  still needs authored idle GLBs (see `docs/assets/model-credits.md`).
 - #15 `academyCampus` and #16 `churchGrounds`: new lightweight outdoor maps that
   link the plaza to the existing academy/church interiors.
 - #17 Capital scale expansion: the four-block plan is defined as a staged

@@ -86,8 +86,8 @@ Status as of branch `feature/resolve-open-gameplay-issues-20260629`:
 | #10 | Minimap / next destination | Completed | Official read-only `window.__AURELIA_MINIMAP__` API; minimap uses exact player pos (no camera approx). |
 | #11 | Flags / permits / progression | Completed | Derived `player.items` permit object; hotbar reflects progress; guard rules verified against quest chain. |
 | #12 | Caravan fireball action | Completed | Pulsing ⚠TARGET marker over the bite-hound, more forgiving hit radius, rescue cannot complete via dialogue. |
-| #13 | NPC / cart clipping | Partial | Added stuck-counter re-route + `__AURELIA_DEBUG__.movers()`; still collider-based, not full pathfinding. |
-| #14 | Fixed-NPC T-pose | Partial | Mixer infra plays idle clips if present; current CC0 assets have 0 clips, so T-pose remains (needs authored GLB). |
+| #13 | NPC / cart clipping | Partial | Movers now check nearby movers and the player before stepping, then sidestep/re-route when blocked. Still collider-based, not full pathfinding. |
+| #14 | Fixed-NPC T-pose | Partial | glTF materials are normalized, invalid models keep primitive fallback, idle clips play when present, and no-clip fixed NPCs get a small bind-pose sway. Full arm-pose cleanup still needs authored GLB. |
 | #15 | Academy campus map | Completed | New `academyCampus` map (gate/courtyard/lecture hall/tower/garden/yard) linking plaza ↔ academy interior. |
 | #16 | Cathedral grounds map | Completed | New `churchGrounds` map (cathedral/spires/stained glass/garden/fountain/records) linking plaza ↔ church interior. |
 | #17 | Capital scale expansion | Partial (Phase 2) | Added `administrativeStreet` as a mixed civic/living street with permit and record windows; no four-theme-district split or 4x rebuild. |
